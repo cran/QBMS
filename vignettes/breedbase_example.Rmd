@@ -1,28 +1,21 @@
 ---
-title: "QBMS Tutorial"
+title: "BreedBase Example"
 author: "Khaled Al-Shamaa"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{QBMS Tutorial}
+  %\VignetteIndexEntry{BreedBase Example}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
-# QBMS
-<!-- https://shields.io/ -->
+## QBMS
 Linking data management systems to analytics is an important step in breeding digitalization. Breeders can use this R package to Query the [Breeding Management System](https://bmspro.io/) database (using [BrAPI](https://brapi.org/) calls) and help them to retrieve their experiments data directly into R statistical analyzing environment.
 
->___Author and Maintainer:__ [Khaled Al-Shamaa](https://github.com/khaled-alshamaa) <k.el-shamaa (at) cgiar (dot) org>_
->
->___Contributor:__ [Mariano Omar CRIMI](https://github.com/mcrimi) <m.crimi (at) cgiar (dot) org>_
->
->___Contributor:__ Zakaria Kehel <z.kehel (at) cgiar (dot) org>_
->
->___Copyright Holder:__ [International Center for Agricultural Research in the Dry Areas (ICARDA)](https://www.icarda.org/)_
+Well, because **Breedbase** supports the **BrAPI** standard, most of the QBMS functionalities work smoothly with minor changes. For example, you need to give special attention to the `set_qbms_config` parameters (check the example below). Currently, some functions are not supported when working with BreedBase, like `get_program_studies`, `get_germplasm_data`, and `list_trials` filtered by year!
 
-## Breeding Management System
-Breeding Management System ([BMS](https://bmspro.io/)) is an information management system developed by the Integrated Breeding Platform to help breeders manage the breeding process, from programme planning to decision-making. The BMS is customizable for most crop breeding programs, and comes pre-loaded with curated ontology terms for many crops (bean, cassava, chickpea, cowpea, groundnut, maize, rice, sorghum, soybean, wheat, and others). The BMS is available as a cloud application, which can be installed on local or remote servers and accessed by multiple users.
+## BreedBase
+[Breedbase](https://breedbase.org/) is a comprehensive breeding management and analysis software. It can be used to design field layouts, collect phenotypic information using tablets, support the collection of genotyping samples in a field, store large amounts of high density genotypic information, and provide Genomic Selection related analyses and predictions.
 
 ## BrAPI
 The Breeding API ([BrAPI](https://brapi.org/)) project is an effort to enable interoperability among plant breeding databases. BrAPI is a standardized RESTful web service API specification for communicating plant breeding data. This community driven standard is free to be used by anyone interested in plant breeding data management.
@@ -33,40 +26,34 @@ install.packages("remotes")
 remotes::install_github("icarda-git/QBMS")
 ```
 
-___If you are not already an active BMS user, you can contact [IBP support](https://ibplatform.atlassian.net/servicedesk/customer/portal/4/group/30/create/60) to get access to a trial BMS server.___
+>*You can find a set of Breedbase based servers available for several crops and accessible with no authentication required are listed at the BrAPI website on the following page under the group of **Boyce Thompson Institute (BTI)**, discovery and innovation in the life sciences: [https://brapi.org/servers](https://brapi.org/servers).*
 
 ## _Example_
 ```r
 # load the QBMS library
 library(QBMS)
 
-# config your BMS connection (by providing your BMS login page URL)
-set_qbms_config("https://www.bms-uat-test.net/ibpworkbench/controller/auth/login")
-
-# login using your BMS account (interactive mode)
-# or pass your BMS username and password as parameters (batch mode)
-login_bms()
+# Cassava BreedBase server
+set_qbms_config("https://cassavabase.org/brapi/v1/calls/", 
+                path = "", time_out = 300, no_auth = TRUE, engine = "breedbase")
 
 # list supported crops in the current bms server
 list_crops()
 
 # select a crop by name
-set_crop("maize")
+set_crop("Cassava")
 
 # list all breeding programs in the selected crop
 list_programs()
 
 # select a breeding program by name
-set_program("MC Maize")
+set_program("IITA")
 
 # list all studies/trials in the selected program
 list_trials()
 
-# filtered by year of starting date
-list_trials(2020)
-
 # select a specific study/trial by name
-set_trial("2018 PVT")
+set_trial("20_Abuja")
 
 # get observation variable ontology in the selected study/trial
 ontology <- get_trial_obs_ontology()
@@ -75,28 +62,19 @@ ontology <- get_trial_obs_ontology()
 list_studies()
 
 # select a specific environment/location by name
-set_study("2018 PVT Environment Number 1")
+set_study("20NCRP12yrtAB")
 
 # select a specific study by location name (first match)
 studies <- list_studies()
-set_study(studies[studies$locationName == "BASF Bremen", "studyName"][1])
+set_study(studies[studies$locationName == "Abuja", "studyName"][1])
 
-# retrieve data, general information, and germplasm list of the selected environment/location
-data <- get_study_data()
+# retrieve general information, data, and germplasm list of the selected environment/location
 info <- get_study_info()
+data <- get_study_data()
 germplasm <- get_germplasm_list()
-
-# get the pedigree table
-pedigree_table <- get_pedigree_table(germplasm, "germplasmName", "pedigree")
 
 # retrieve multi-environment trial data of the selected study/trial
 MET <- get_trial_data()
-
-# retrieve all environments/locations information in the selected program
-program_studies <- get_program_studies()
-
-# retrieve observations data of given germplasm aggregated from all trials in the selected program
-germplasm_observations <- get_germplasm_data("BASFCORN-2-1")
 
 ```
 ## _Troubleshooting the installation_

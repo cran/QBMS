@@ -14,7 +14,7 @@
 
 <meta name="date" content="2022-03-02" />
 
-<title>QBMS Tutorial</title>
+<title>BreedBase Example</title>
 
 <script src="data:application/javascript;base64,Ly8gUGFuZG9jIDIuOSBhZGRzIGF0dHJpYnV0ZXMgb24gYm90aCBoZWFkZXIgYW5kIGRpdi4gV2UgcmVtb3ZlIHRoZSBmb3JtZXIgKHRvCi8vIGJlIGNvbXBhdGlibGUgd2l0aCB0aGUgYmVoYXZpb3Igb2YgUGFuZG9jIDwgMi44KS4KZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcignRE9NQ29udGVudExvYWRlZCcsIGZ1bmN0aW9uKGUpIHsKICB2YXIgaHMgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCJkaXYuc2VjdGlvbltjbGFzcyo9J2xldmVsJ10gPiA6Zmlyc3QtY2hpbGQiKTsKICB2YXIgaSwgaCwgYTsKICBmb3IgKGkgPSAwOyBpIDwgaHMubGVuZ3RoOyBpKyspIHsKICAgIGggPSBoc1tpXTsKICAgIGlmICghL15oWzEtNl0kL2kudGVzdChoLnRhZ05hbWUpKSBjb250aW51ZTsgIC8vIGl0IHNob3VsZCBiZSBhIGhlYWRlciBoMS1oNgogICAgYSA9IGguYXR0cmlidXRlczsKICAgIHdoaWxlIChhLmxlbmd0aCA+IDApIGgucmVtb3ZlQXR0cmlidXRlKGFbMF0ubmFtZSk7CiAgfQp9KTsK"></script>
 
@@ -139,25 +139,20 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 
 
 
-<h1 class="title toc-ignore">QBMS Tutorial</h1>
+<h1 class="title toc-ignore">BreedBase Example</h1>
 <h4 class="author">Khaled Al-Shamaa</h4>
 <h4 class="date">2022-03-02</h4>
 
 
 
-<div id="qbms" class="section level1">
-<h1>QBMS</h1>
-<!-- https://shields.io/ -->
+<div id="qbms" class="section level2">
+<h2>QBMS</h2>
 <p>Linking data management systems to analytics is an important step in breeding digitalization. Breeders can use this R package to Query the <a href="https://bmspro.io/">Breeding Management System</a> database (using <a href="https://brapi.org/">BrAPI</a> calls) and help them to retrieve their experiments data directly into R statistical analyzing environment.</p>
-<blockquote>
-<p><em><strong>Author and Maintainer:</strong> <a href="https://github.com/khaled-alshamaa">Khaled Al-Shamaa</a> &lt;k.el-shamaa (at) cgiar (dot) org&gt;</em></p>
-<p><em><strong>Contributor:</strong> <a href="https://github.com/mcrimi">Mariano Omar CRIMI</a> &lt;m.crimi (at) cgiar (dot) org&gt;</em></p>
-<p><em><strong>Contributor:</strong> Zakaria Kehel &lt;z.kehel (at) cgiar (dot) org&gt;</em></p>
-<p><em><strong>Copyright Holder:</strong> <a href="https://www.icarda.org/">International Center for Agricultural Research in the Dry Areas (ICARDA)</a></em></p>
-</blockquote>
-<div id="breeding-management-system" class="section level2">
-<h2>Breeding Management System</h2>
-<p>Breeding Management System (<a href="https://bmspro.io/">BMS</a>) is an information management system developed by the Integrated Breeding Platform to help breeders manage the breeding process, from programme planning to decision-making. The BMS is customizable for most crop breeding programs, and comes pre-loaded with curated ontology terms for many crops (bean, cassava, chickpea, cowpea, groundnut, maize, rice, sorghum, soybean, wheat, and others). The BMS is available as a cloud application, which can be installed on local or remote servers and accessed by multiple users.</p>
+<p>Well, because <strong>Breedbase</strong> supports the <strong>BrAPI</strong> standard, most of the QBMS functionalities work smoothly with minor changes. For example, you need to give special attention to the <code>set_qbms_config</code> parameters (check the example below). Currently, some functions are not supported when working with BreedBase, like <code>get_program_studies</code>, <code>get_germplasm_data</code>, and <code>list_trials</code> filtered by year!</p>
+</div>
+<div id="breedbase" class="section level2">
+<h2>BreedBase</h2>
+<p><a href="https://breedbase.org/">Breedbase</a> is a comprehensive breeding management and analysis software. It can be used to design field layouts, collect phenotypic information using tablets, support the collection of genotyping samples in a field, store large amounts of high density genotypic information, and provide Genomic Selection related analyses and predictions.</p>
 </div>
 <div id="brapi" class="section level2">
 <h2>BrAPI</h2>
@@ -167,70 +162,57 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <h2><em>Install</em></h2>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="st">&quot;remotes&quot;</span>)</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>remotes<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">&quot;icarda-git/QBMS&quot;</span>)</span></code></pre></div>
-<p><strong><em>If you are not already an active BMS user, you can contact <a href="https://ibplatform.atlassian.net/servicedesk/customer/portal/4/group/30/create/60">IBP support</a> to get access to a trial BMS server.</em></strong></p>
+<blockquote>
+<p><em>You can find a set of Breedbase based servers available for several crops and accessible with no authentication required are listed at the BrAPI website on the following page under the group of <strong>Boyce Thompson Institute (BTI)</strong>, discovery and innovation in the life sciences: <a href="https://brapi.org/servers">https://brapi.org/servers</a>.</em></p>
+</blockquote>
 </div>
 <div id="example" class="section level2">
 <h2><em>Example</em></h2>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># load the QBMS library</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(QBMS)</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># config your BMS connection (by providing your BMS login page URL)</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">set_qbms_config</span>(<span class="st">&quot;https://www.bms-uat-test.net/ibpworkbench/controller/auth/login&quot;</span>)</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># login using your BMS account (interactive mode)</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co"># or pass your BMS username and password as parameters (batch mode)</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="fu">login_bms</span>()</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Cassava BreedBase server</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">set_qbms_config</span>(<span class="st">&quot;https://cassavabase.org/brapi/v1/calls/&quot;</span>, </span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>                <span class="at">path =</span> <span class="st">&quot;&quot;</span>, <span class="at">time_out =</span> <span class="dv">300</span>, <span class="at">no_auth =</span> <span class="cn">TRUE</span>, <span class="at">engine =</span> <span class="st">&quot;breedbase&quot;</span>)</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co"># list supported crops in the current bms server</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="fu">list_crops</span>()</span>
 <span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co"># list supported crops in the current bms server</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="fu">list_crops</span>()</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co"># select a crop by name</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="fu">set_crop</span>(<span class="st">&quot;Cassava&quot;</span>)</span>
 <span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co"># select a crop by name</span></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="fu">set_crop</span>(<span class="st">&quot;maize&quot;</span>)</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co"># list all breeding programs in the selected crop</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="fu">list_programs</span>()</span>
 <span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="co"># list all breeding programs in the selected crop</span></span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="fu">list_programs</span>()</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="co"># select a breeding program by name</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="fu">set_program</span>(<span class="st">&quot;IITA&quot;</span>)</span>
 <span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="co"># select a breeding program by name</span></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="fu">set_program</span>(<span class="st">&quot;MC Maize&quot;</span>)</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="co"># list all studies/trials in the selected program</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="fu">list_trials</span>()</span>
 <span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="co"># list all studies/trials in the selected program</span></span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="fu">list_trials</span>()</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="co"># select a specific study/trial by name</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="fu">set_trial</span>(<span class="st">&quot;20_Abuja&quot;</span>)</span>
 <span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="co"># filtered by year of starting date</span></span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a><span class="fu">list_trials</span>(<span class="dv">2020</span>)</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="co"># get observation variable ontology in the selected study/trial</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>ontology <span class="ot">&lt;-</span> <span class="fu">get_trial_obs_ontology</span>()</span>
 <span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="co"># select a specific study/trial by name</span></span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a><span class="fu">set_trial</span>(<span class="st">&quot;2018 PVT&quot;</span>)</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="co"># list all environments/locations information in the selected study/trial</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a><span class="fu">list_studies</span>()</span>
 <span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="co"># get observation variable ontology in the selected study/trial</span></span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>ontology <span class="ot">&lt;-</span> <span class="fu">get_trial_obs_ontology</span>()</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="co"># select a specific environment/location by name</span></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a><span class="fu">set_study</span>(<span class="st">&quot;20NCRP12yrtAB&quot;</span>)</span>
 <span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="co"># list all environments/locations information in the selected study/trial</span></span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a><span class="fu">list_studies</span>()</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a><span class="co"># select a specific environment/location by name</span></span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a><span class="fu">set_study</span>(<span class="st">&quot;2018 PVT Environment Number 1&quot;</span>)</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a><span class="co"># select a specific study by location name (first match)</span></span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>studies <span class="ot">&lt;-</span> <span class="fu">list_studies</span>()</span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a><span class="fu">set_study</span>(studies[studies<span class="sc">$</span>locationName <span class="sc">==</span> <span class="st">&quot;BASF Bremen&quot;</span>, <span class="st">&quot;studyName&quot;</span>][<span class="dv">1</span>])</span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a><span class="co"># retrieve data, general information, and germplasm list of the selected environment/location</span></span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">get_study_data</span>()</span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>info <span class="ot">&lt;-</span> <span class="fu">get_study_info</span>()</span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>germplasm <span class="ot">&lt;-</span> <span class="fu">get_germplasm_list</span>()</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a><span class="co"># get the pedigree table</span></span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>pedigree_table <span class="ot">&lt;-</span> <span class="fu">get_pedigree_table</span>(germplasm, <span class="st">&quot;germplasmName&quot;</span>, <span class="st">&quot;pedigree&quot;</span>)</span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a><span class="co"># retrieve multi-environment trial data of the selected study/trial</span></span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>MET <span class="ot">&lt;-</span> <span class="fu">get_trial_data</span>()</span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a><span class="co"># retrieve all environments/locations information in the selected program</span></span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>program_studies <span class="ot">&lt;-</span> <span class="fu">get_program_studies</span>()</span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a><span class="co"># retrieve observations data of given germplasm aggregated from all trials in the selected program</span></span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>germplasm_observations <span class="ot">&lt;-</span> <span class="fu">get_germplasm_data</span>(<span class="st">&quot;BASFCORN-2-1&quot;</span>)</span></code></pre></div>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="co"># select a specific study by location name (first match)</span></span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>studies <span class="ot">&lt;-</span> <span class="fu">list_studies</span>()</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a><span class="fu">set_study</span>(studies[studies<span class="sc">$</span>locationName <span class="sc">==</span> <span class="st">&quot;Abuja&quot;</span>, <span class="st">&quot;studyName&quot;</span>][<span class="dv">1</span>])</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a><span class="co"># retrieve general information, data, and germplasm list of the selected environment/location</span></span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>info <span class="ot">&lt;-</span> <span class="fu">get_study_info</span>()</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">get_study_data</span>()</span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>germplasm <span class="ot">&lt;-</span> <span class="fu">get_germplasm_list</span>()</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a><span class="co"># retrieve multi-environment trial data of the selected study/trial</span></span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>MET <span class="ot">&lt;-</span> <span class="fu">get_trial_data</span>()</span></code></pre></div>
 </div>
 <div id="troubleshooting-the-installation" class="section level2">
 <h2><em>Troubleshooting the installation</em></h2>
@@ -241,7 +223,6 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">Sys.setenv</span>(<span class="st">&quot;R_REMOTES_NO_ERRORS_FROM_WARNINGS&quot;</span> <span class="ot">=</span> <span class="cn">TRUE</span>)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>remotes<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">&quot;icarda-git/QBMS&quot;</span>, <span class="at">upgrade =</span> <span class="st">&quot;always&quot;</span>)</span></code></pre></div>
-</div>
 </div>
 
 

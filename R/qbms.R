@@ -62,11 +62,11 @@ debug_qbms <- function() {
 #' Set the connection configuration of the BMS server
 #'
 #' @param url       URL of the BMS login page (default is "http://localhost/ibpworkbench/")
-#' @param path      BMS API path (default is "bmsapi")
+#' @param path      BMS API path (default is NULL)
 #' @param page_size Page size (default is 1000)
 #' @param time_out  Number of seconds to wait for a response until giving up (default is 10)
 #' @param no_auth   TRUE if the server doesn't require authentication/login (default is FALSE)
-#' @param engine    Backend database (qbms default, breedbase)
+#' @param engine    Backend database (qbms default, breedbase, gigwa)
 #' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
 #' @return no return value
 #' @examples
@@ -74,9 +74,15 @@ debug_qbms <- function() {
 #' @export
 
 set_qbms_config <- function(url = "http://localhost/ibpworkbench/controller/auth/login",
-                            path = "bmsapi", page_size = 1000, time_out = 120,
+                            path = NULL, page_size = 1000, time_out = 120,
                             no_auth = FALSE, engine = "bms") {
 
+  if (is.null(path)) {
+    if (engine == "bms") { path = "bmsapi" }
+    if (engine == "breedbase") { path = "" }
+    if (engine == "gigwa") { path = "gigwa/rest"}
+  }
+  
   qbms_globals$config$server    <- regmatches(url, regexpr("^(?://|[^/]+)*", url))
   qbms_globals$config$path      <- path
   qbms_globals$config$page_size <- page_size
@@ -135,10 +141,14 @@ brapi_get_call <- function(call_url, page = 0, nested = TRUE) {
 #' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
 
 get_login_details <- function() {
+  if (qbms_globals$config$engine == "bms") { server <- "BMS" }
+  if (qbms_globals$config$engine == "breedbase") { server <- "BreedBase" }
+  if (qbms_globals$config$engine == "gigwa") { server <- "GIGWA" }
+  
   tt <- tcltk::tktoplevel()
-  tcltk::tkwm.title(tt, "Login BMS Server")
+  tcltk::tkwm.title(tt, paste("Login", server, "Server"))
 
-  ss <- "Please enter your BMS login details"
+  ss <- paste("Please enter your", server, "login details")
   tcltk::tkgrid(tcltk::tklabel(tt, text = ss), columnspan = 2, padx = 50, pady = 10)
 
   usr <- tcltk::tclVar("")
@@ -168,10 +178,10 @@ get_login_details <- function() {
 }
 
 
-#' Login to the BMS server
+#' Login to the server
 #'
 #' @description
-#' Connect to the BMS server. If username or password parameters are missing,
+#' Connect to the server. If username or password parameters are missing,
 #' then a login window will pop-up to insert username and password.
 #'
 #' All other connection parameters (i.e. server IP or domain, connection port,
@@ -181,8 +191,8 @@ get_login_details <- function() {
 #' This function will update both of the qbms_config list (brapi connection
 #' object in the con key) and qbms_state list (token value in the token key).
 #'
-#' @param username the BMS username (optional, default is NULL)
-#' @param password the BMS password (optional, default is NULL)
+#' @param username the username (optional, default is NULL)
+#' @param password the password (optional, default is NULL)
 #' @return no return value
 #' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
 #' @examples
@@ -241,7 +251,7 @@ login_bms <- function(username = NULL, password = NULL) {
 
 list_crops <- function() {
   if (is.null(qbms_globals$state$token)) {
-    stop("No BMS server has been connected yet! You have to connect a BMS server first using the `bms_login()` function")
+    stop("No server has been connected yet! You have to connect a server first using the `bms_login()` function")
   }
 
   call_url <- paste0(qbms_globals$config$base_url, "/brapi/v1/crops")
@@ -318,7 +328,7 @@ set_crop <- function(crop_name) {
 
 list_programs <- function() {
   if (is.null(qbms_globals$state$token)) {
-    stop("No BMS server has been connected yet! You have to connect a BMS server first using the `bms_login()` function")
+    stop("No server has been connected yet! You have to connect a server first using the `bms_login()` function")
   }
 
   if (is.null(qbms_globals$config$crop)) {
@@ -801,8 +811,6 @@ get_germplasm_list <- function() {
                        "/programs/", qbms_globals$state$program_db_id,
                        "/studies/", qbms_globals$state$trial_db_id, "/entries")
 
-    call_body <- paste0('{"filter":{"entryNumbers": ["', paste0(germplasm_list$entryNumber, collapse = '","'), '"]}}')
-
     response <- httr::POST(url = utils::URLencode(call_url), body = "", encode = "json",
                            httr::add_headers(c("X-Auth-Token" = qbms_globals$state$token), "Accept-Encoding" = "gzip, deflate"),
                            httr::timeout(qbms_globals$config$time_out))
@@ -1004,7 +1012,7 @@ get_program_studies <- function() {
   colnames(program_trials) <- gsub("additionalInfo.", "", colnames(program_trials))
 
   for (row in 1:nrow(program_trials)) {
-    trial <- program_trials[row, -7]
+    trial <- program_trials[row, ]
     trial_studies <- rbindlistx(program_trials[row, "studies"])
     if (nrow(trial_studies) > 0) {
       if (row == 1) {
@@ -1015,7 +1023,8 @@ get_program_studies <- function() {
     }
   }
 
-  studies <- studies[, unique(colnames(studies))]
+  # remove locationDbId, active, studies, and locationName columns coming from the trial data.frame
+  studies <- studies[, -c(6, 7, 8, 14)]
 
   crop_locations <- get_crop_locations()
 
@@ -1024,18 +1033,31 @@ get_program_studies <- function() {
   studies$testEntriesCount <- 0
 
   crop_url <- paste0(qbms_globals$config$base_url, "/crops/", qbms_globals$config$crop)
+  
+  all_trials <- unique(studies$trialDbId)
+  num_trials <- length(all_trials)
+  
+  pb <- utils::txtProgressBar(min = 0, max = num_trials, initial = 0, style = 3) 
+  pb_step <- round(num_trials/100)
 
-  for (i in unique(studies$trialDbId)) {
-    call_url <- paste0(crop_url, "/programs/", qbms_globals$state$program_db_id, "/studies/", i, "/entries/metadata")
+  for (i in 1:num_trials) {
+    call_url <- paste0(crop_url, "/programs/", qbms_globals$state$program_db_id, "/studies/", all_trials[i], "/entries/metadata")
 
     response <- httr::GET(url = utils::URLencode(call_url),
                           httr::add_headers("X-Auth-Token" = qbms_globals$state$token, "Accept-Encoding" = "gzip, deflate"),
                           httr::timeout(qbms_globals$config$time_out))
+    
     metadata <- jsonlite::fromJSON(httr::content(response, as = "text"), flatten = TRUE)
 
-    studies[studies$trialDbId == i, "testEntriesCount"] <- metadata$testEntriesCount
-    studies[studies$trialDbId == i, "checkEntriesCount"] <- metadata$checkEntriesCount
+    studies[studies$trialDbId == all_trials[i], "testEntriesCount"] <- metadata$testEntriesCount
+    studies[studies$trialDbId == all_trials[i], "checkEntriesCount"] <- metadata$checkEntriesCount
+    
+    # update the progress bar
+    utils::setTxtProgressBar(pb, i)
   }
+  
+  utils::setTxtProgressBar(pb, num_trials)
+  close(pb)
 
   return(studies)
 }
@@ -1368,4 +1390,500 @@ get_pedigree_table <- function(data, geno_column = "germplasmName", pedigree_col
   pedigree_df <- build_pedigree_table(geno_list, pedigree_list)
 
   return(pedigree_df)
+}
+
+###########################################################################################
+
+#' Login to the GIGWA server
+#'
+#' @description
+#' Connect to the GIGWA server. If username or password parameters are missing,
+#' then a login window will pop-up to insert username and password.
+#'
+#' All other connection parameters (i.e. server IP or domain, connection port,
+#' API path, and connection protocol e.g. http://) will retrieve from the
+#' qbms_config list.
+#'
+#' This function will update both of the qbms_config list (brapi connection
+#' object in the con key) and qbms_state list (token value in the token key).
+#'
+#' @param username the GIGWA username (optional, default is NULL)
+#' @param password the GIGWA password (optional, default is NULL)
+#' @return no return value
+#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @examples
+#' if(interactive()) {
+#' # config your GIGWA connection
+#' set_qbms_config("http://localhost:59395/gigwa/index.jsp", time_out = 300, engine = "gigwa")
+#'
+#' # login using your GIGWA account (interactive mode)
+#' # you can pass GIGWA username and password as parameters (batch mode)
+#' login_gigwa()
+#' login_gigwa("gigwadmin", "nimda")
+#' }
+#' @export
+
+login_gigwa <- function(username = NULL, password = NULL) {
+  if (is.null(username) || is.null(password)) {
+    credentials <- get_login_details()
+  } else {
+    credentials <- c(usr = username, pwd = password)
+  }
+  
+  call_url  <- paste0(qbms_globals$config$base_url, "/gigwa/generateToken")
+  call_body <- list(username = credentials["usr"], password = credentials["pwd"])
+  
+  response <- httr::POST(url = utils::URLencode(call_url), body = call_body, encode = "json",
+                         httr::timeout(qbms_globals$config$time_out))
+  
+  if (response$status_code == 403 || credentials["usr"] == "" || credentials["pwd"] == "") {
+    stop("403 Forbidden")
+  }
+  
+  qbms_globals$state$token <- httr::content(response)$token
+}
+
+#' Get the list of existing databases in the current GIGWA server
+#'
+#' @return a list of existing databases
+#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @seealso \code{\link{set_qbms_config}}
+#' @examples
+#' if(interactive()) {
+#' # config your GIGWA connection
+#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
+#'
+#' # list existing databases in the GIGWA server
+#' gigwa_list_dbs()
+#' }
+#' @export
+
+gigwa_list_dbs <- function() {
+  if (is.null(qbms_globals$state$token)) {
+    stop("No server has been connected yet! You have to connect a server first using the `gigwa_login()` function")
+  }
+  
+  call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/programs")
+  
+  gigwa_dbs <- brapi_get_call(call_url)
+  
+  return(gigwa_dbs$data)
+}
+
+#' Set the current active GIGWA database by name
+#'
+#' @description
+#' This function will update the current active database in the internal
+#' configuration object (including the brapi connection object).
+#'
+#' @param db_name the name of the database
+#' @return no return value
+#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @seealso \code{\link{set_qbms_config}}, \code{\link{gigwa_list_dbs}}
+#' @examples
+#' if(interactive()) {
+#' # config your GIGWA connection
+#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
+#'
+#' # select a database by name
+#' gigwa_set_db("Sorghum-JGI_v1")
+#' }
+#' @export
+
+gigwa_set_db <- function(db_name) {
+  valid_dbs <- gigwa_list_dbs()
+  
+  if (!db_name %in% valid_dbs[,1]) {
+    stop("Your database name is not exists in this connected GIGWA server! You may use the `gigwa_list_dbs()` function to check the available databases")
+  }
+  
+  qbms_globals$config$db <- db_name
+}
+
+#' Get the list of all projects in the selected GIGWA database
+#'
+#' @description
+#' This function will retrieve the projects list from the current active
+#' database as configured in the internal configuration object using `gigwa_set_db()`
+#' function.
+#'
+#' @return a list of projects names
+#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @seealso \code{\link{set_qbms_config}}, \code{\link{gigwa_set_db}}
+#' @examples
+#' if(interactive()) {
+#' # config your GIGWA connection
+#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
+#'
+#' # select a database by name
+#' gigwa_set_db("Sorghum-JGI_v1")
+#'
+#' # list existing projects
+#' gigwa_list_projects()
+#' }
+#' @export
+
+gigwa_list_projects <- function() {
+  if (is.null(qbms_globals$state$token)) {
+    stop("No server has been connected yet! You have to connect a GIGWA server first using the `gigwa_login()` function")
+  }
+  
+  if (is.null(qbms_globals$config$db)) {
+    stop("No database has been selected yet! You have to set your database first using the `gigwa_set_db()` function")
+  }
+  
+  call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/studies?programDbId=", qbms_globals$config$db)
+  
+  gigwa_projects <- brapi_get_call(call_url)
+  
+  gigwa_projects <- gigwa_projects$data[c("studyName")]
+
+  return(gigwa_projects)
+}
+
+#' Set the current active GIGWA project
+#'
+#' @description
+#' This function will update the current active project in the internal state object 
+#' using the programDbId retrieved from GIGWA which is associated to the given 
+#' `project_name` parameter.
+#'
+#' @param project_name the name of the project
+#' @return no return value
+#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @seealso \code{\link{set_qbms_config}}, \code{\link{gigwa_set_db}}, \code{\link{gigwa_list_projects}}
+#' @examples
+#' if(interactive()) {
+#' # config your GIGWA connection
+#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
+#'
+#' # select a database by name
+#' gigwa_set_db("Sorghum-JGI_v1")
+#'
+#' # select a project by name
+#' gigwa_set_project("Nelson_et_al_2011")
+#' }
+#' @export
+
+gigwa_set_project <- function(project_name) {
+  valid_projects <- gigwa_list_projects()
+  
+  if (!project_name %in% valid_projects[,1]) {
+    stop("Your project name is not exists in this database! You may use the `gigwa_list_projects()` function to check the available projects")
+  }
+  
+  call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/studies?programDbId=", qbms_globals$config$db)
+  
+  gigwa_projects <- brapi_get_call(call_url)
+
+  project_row <- which(gigwa_projects$data$studyName == project_name)
+  
+  qbms_globals$state$study_db_id <- gigwa_projects$data[project_row, "studyDbId"]
+}
+
+#' Get the list of run names in the selected GIGWA project
+#'
+#' @description
+#' This function will retrieve the runs list from the current active project as configured 
+#' in the internal configuration object using `gigwa_set_project()` function.
+#'
+#' @return a list of runs names
+#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @seealso \code{\link{set_qbms_config}}, \code{\link{gigwa_set_project}}
+#' @examples
+#' if(interactive()) {
+#' # config your GIGWA connection
+#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
+#'
+#' # select a database by name
+#' gigwa_set_db("Sorghum-JGI_v1")
+#'
+#' # select a project by name
+#' gigwa_set_project("Nelson_et_al_2011")
+#' 
+#' # list all runs in the selected project
+#' gigwa_list_runs()
+#' }
+#' @export
+
+gigwa_list_runs <- function() {
+  if (is.null(qbms_globals$state$study_db_id)) {
+    stop("No project has been selected yet! You have to set your project first using the `gigwa_set_project()` function")
+  }
+  
+  call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/search/variantsets")
+  
+  auth_code <- paste0("Bearer ", qbms_globals$state$token)
+  headers   <- c("Authorization" = auth_code, "Accept-Encoding" = "gzip, deflate")
+  call_body <- paste0('{"studyDbIds": ["', qbms_globals$state$study_db_id, '"]}')
+  
+  response <- httr::POST(url = utils::URLencode(call_url), body = call_body, 
+                         encode = "raw", httr::accept_json(), httr::content_type_json(), 
+                         httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
+  
+  results <- jsonlite::fromJSON(httr::content(response, as = "text"), flatten = TRUE)
+  
+  gigwa_runs <- as.data.frame(results$result$data$variantSetName)
+  
+  colnames(gigwa_runs) <- c("variantSetName")
+
+  return(gigwa_runs)
+}
+
+#' Set the current active GIGWA run
+#'
+#' @description
+#' This function will update the current active run in the internal state object using the 
+#' `studyDbIds` retrieved from GIGWA which is associated to the given run_name parameter.
+#'
+#' @param run_name the name of the run
+#' @return no return value
+#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @seealso \code{\link{set_qbms_config}}, \code{\link{gigwa_set_project}}, \code{\link{gigwa_list_runs}}
+#' @examples
+#' if(interactive()) {
+#' # config your GIGWA connection
+#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
+#'
+#' # select a database by name
+#' gigwa_set_db("Sorghum-JGI_v1")
+#'
+#' # select a project by name
+#' gigwa_set_project("Nelson_et_al_2011")
+#' 
+#' # select a specific run by name
+#' gigwa_set_run("run1")
+#' }
+#' @export
+
+gigwa_set_run <- function(run_name) {
+  valid_runs <- gigwa_list_runs()
+  
+  if (!run_name %in% valid_runs) {
+    stop("Your run name is not exists in this project! You may use the `gigwa_list_runs()` function to check the available runs")
+  }
+  
+  call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/search/variantsets")
+  
+  auth_code <- paste0("Bearer ", qbms_globals$state$token)
+  headers   <- c("Authorization" = auth_code, "Accept-Encoding" = "gzip, deflate")
+  call_body <- paste0('{"studyDbIds": ["', qbms_globals$state$study_db_id, '"]}')
+  
+  response <- httr::POST(url = utils::URLencode(call_url), body = call_body, 
+                         encode = "raw", httr::accept_json(), httr::content_type_json(), 
+                         httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
+  
+  results <- jsonlite::fromJSON(httr::content(response, as = "text"), flatten = TRUE)
+  
+  gigwa_runs <- as.data.frame(results$result$data)
+  
+  qbms_globals$state$variant_set_db_id <- gigwa_runs[gigwa_runs$variantSetName == run_name, "variantSetDbId"]
+}
+
+#' Get the samples list of the current active GIGWA run
+#'
+#' @description
+#' This function will retrieve the samples list of the current active run
+#' as configured in the internal state object using `gigwa_set_run()` function.
+#'
+#' @return a vector of all samples in the selected run
+#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @seealso \code{\link{set_qbms_config}}, \code{\link{gigwa_set_run}}
+#' @examples
+#' if(interactive()) {
+#' # config your GIGWA connection
+#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
+#'
+#' # select a database by name
+#' gigwa_set_db("Sorghum-JGI_v1")
+#'
+#' # select a project by name
+#' gigwa_set_project("Nelson_et_al_2011")
+#' 
+#' # select a specific run by name
+#' gigwa_set_run("run1")
+#' 
+#' # get a list of all samples in the selected run
+#' samples <- gigwa_get_samples()
+#' }
+#' @export
+
+gigwa_get_samples <- function() {
+  if (is.null(qbms_globals$state$study_db_id)) {
+    stop("No project has been selected yet! You have to set your project first using the `gigwa_set_project()` function")
+  }
+  
+  call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/search/germplasm")
+
+  auth_code <- paste0("Bearer ", qbms_globals$state$token)
+  headers   <- c("Authorization" = auth_code, "Accept-Encoding" = "gzip, deflate")
+  call_body <- paste0('{"studyDbIds": ["', qbms_globals$state$study_db_id, '"]}')
+  
+  response <- httr::POST(url = utils::URLencode(call_url), body = call_body, 
+                         encode = "raw", httr::accept_json(), httr::content_type_json(), 
+                         httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
+  
+  results <- jsonlite::fromJSON(httr::content(response, as = "text"), flatten = TRUE)
+  
+  return(results$result$data$germplasmName)
+}
+
+#' Get variants in the selected GIGWA run
+#'
+#' @description
+#' Query the variants (e.g., SNPs markers) in the selected GIGWA run that match a given criteria.
+#' 
+#' @param max_missing maximum missing ratio (by sample) between 0 and 1 (default is 1 for 100\%).
+#' @param min_maf minimum Minor Allele Frequency (MAF) between 0 and 1 (default is 0 for 0\%).
+#' @param samples a list of a samples subset (default is NULL will retrieve for all samples).
+#' @return A data.frame that has the first 4 columns describe attributes of the SNP 
+#'         (rs#: variant name, alleles: reference allele / alternative allele, chrom: chromosome name, 
+#'         and pos: position in bp), while the following columns describe the SNP value for a 
+#'         single sample line using numerical coding 0, 1, and 2 for reference, heterozygous, and 
+#'         alternative/minor alleles.
+#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @examples
+#' if(interactive()) {
+#' # config your GIGWA connection
+#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
+#'
+#' # select a database by name
+#' gigwa_set_db("Sorghum-JGI_v1")
+#'
+#' # select a project by name
+#' gigwa_set_project("Nelson_et_al_2011")
+#' 
+#' # select a specific run by name
+#' gigwa_set_run("run1")
+#' 
+#' marker_matrix <- gigwa_get_variants(max_missing = 0.2, 
+#'                                     min_maf = 0.35, 
+#'                                     samples = c("ind1", "ind3", "ind7"))
+#' }
+#' @export
+
+gigwa_get_variants <- function(max_missing = 1, min_maf = 0, samples = NULL) {
+  if (is.null(qbms_globals$state$study_db_id)) {
+    stop("No project has been selected yet! You have to set your project first using the `gigwa_set_project()` function")
+  }
+  
+  if (max_missing < 0 || max_missing > 1) {
+    stop("The accepted `max_missing` value for the max missing data can range from 0 to 1")
+  }
+  
+  if (min_maf < 0 || min_maf > 0.5) {
+    stop("The accepted `maf` value for the minimum minor allele frequency can range from 0 to 0.5")
+  }
+
+  if (!is.null(samples)) {
+    available_samples <- gigwa_get_samples()
+    missing_samples <- setdiff(samples, available_samples)
+    
+    if (length(missing_samples) > 0) {
+      stop("Some samples are not exists in this project! You may use the `gigwa_get_samples()` function to check the available samples")
+    }
+  } else {
+    samples <- gigwa_get_samples()
+  }
+
+  # https://gigwa-dev.southgreen.fr/gigwaV2/rest/swagger-ui/index.html?urls.primaryName=GA4GH%20API%20v0.6.0a5#/ga-4gh-rest-controller/searchVariantsUsingPOST
+  # https://ga4gh-schemas.readthedocs.io/en/latest/schemas/variants.proto.html
+  # https://app.swaggerhub.com/apis-docs/PlantBreedingAPI/BrAPI-New-Concept-Preview/0.0.0-proposal#/Genotype-Matrix-Redesign/post_search_variantmatrix
+  # https://github.com/plantbreeding/BrAPI/issues/546
+  
+  call_url <- paste0(qbms_globals$config$base_url, "/ga4gh/variants/search")
+  
+  auth_code <- paste0("Bearer ", qbms_globals$state$token)
+  headers   <- c("Authorization" = auth_code, "Accept-Encoding" = "gzip, deflate")
+  
+  call_body <- list(alleleCount = "2",
+                    searchMode = 0,
+                    variantSetId = qbms_globals$state$study_db_id,
+                    callSetIds = paste0(qbms_globals$state$study_db_id, "\u00A7", samples),
+                    minmaf = min_maf * 100,
+                    maxmaf = 50,
+                    missingData = max_missing * 100)
+  
+  response <- httr::POST(url = utils::URLencode(call_url), body = call_body, encode = "json", 
+                         httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
+  
+  results <- jsonlite::fromJSON(httr::content(response, as = "text"), flatten = TRUE)
+  
+  total_variants <- results$count
+  
+  # setup the progress bar
+  pb <- utils::txtProgressBar(min = 0, max = total_variants, initial = 0, style = 3) 
+  pb_step <- round(total_variants/100)
+  
+  call_body <- list(alleleCount = "2",
+                    searchMode = 3,
+                    variantSetId = qbms_globals$state$study_db_id,
+                    callSetIds = paste0(qbms_globals$state$study_db_id, "\u00A7", samples),
+                    minmaf = min_maf * 100,
+                    maxmaf = 50,
+                    missingData = max_missing * 100,
+                    getGT = TRUE,
+                    pageToken = "0")
+
+  g_matrix <- data.frame(matrix(ncol = length(samples) + 4, nrow = 0))
+  
+  repeat{
+    repeat {
+      # avoid MongoDB error because of a background operation is still running!
+      # get the progress status of a process from its token. If no current process is associated with this token, returns null.
+      # https://gigwa.southgreen.fr/gigwa/rest/swagger-ui/index.html?urls.primaryName=Gigwa%20API%20v2.5-RELEASE#/gigwa-rest-controller/getProcessProgressUsingGET
+      response <- httr::GET(url = paste0(qbms_globals$config$base_url, "/gigwa/progress"), 
+                            httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
+
+      if (httr::content(response, as = "text", encoding = "UTF-8") == "") {
+        break
+      }
+    }
+
+    response <- httr::POST(url = utils::URLencode(call_url), body = call_body, encode = "json", 
+                           httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
+
+    results <- jsonlite::fromJSON(httr::content(response, as = "text"), flatten = TRUE)
+    
+    n <- nrow(results$variants)
+
+    for(i in 1:n){
+      snp_name <- results$variants[i, "id"]
+      alleles  <- paste0(results$variants[i, "referenceBases"], "/", results$variants[i, "alternateBases"])
+      chrom    <- results$variants[i, "referenceName"]
+      pos      <- results$variants[i, "start"]
+      genotype <- unlist(lapply(results$variants[i, "calls"][[1]]$genotype, function(x){ ifelse(length(x) == 0, NA, sum(x)) }))
+      g_matrix <- rbind(g_matrix, c(snp_name, alleles, chrom, pos, genotype))
+    }
+
+    # update the progress bar
+    utils::setTxtProgressBar(pb, nrow(g_matrix))
+    
+    if (!exists("nextPageToken", results)) {
+      break
+    }
+
+    call_body$pageToken <- results$nextPageToken
+    call_body$searchMode <- 2
+  }
+  
+  utils::setTxtProgressBar(pb, total_variants)
+  close(pb)
+  
+  g_matrix[,-c(1:4)] <- as.data.frame(sapply(g_matrix[,-c(1:4)], as.numeric))
+  
+  g_matrix[, 1] <- gsub(paste0(qbms_globals$state$study_db_id, "\u00A7"), "", g_matrix[, 1])
+  
+  colnames(g_matrix) <- c("rs#", "alleles", "chrom", "pos",
+                          gsub(paste0(qbms_globals$state$study_db_id, "\u00A7"), "", results$variants[1, "calls"][[1]]$callSetId))
+
+  return(g_matrix)
 }

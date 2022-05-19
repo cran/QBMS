@@ -1,8 +1,8 @@
 Type: Package
 Package: QBMS
-Title: Query the Breeding Management System 'BMS'
-Version: 0.7.0
-Date: 2022-03-03
+Title: Query the Breeding Management System(s)
+Version: 0.8.0
+Date: 2022-05-18
 Authors@R: c(
     person("Khaled", "Al-Shamaa", , "k.el-shamaa@cgiar.org", role = c("aut", "cre")),
     person("Mariano Omar", "Crimi", , "m.crimi@cgiar.org", role = "ctb"),
@@ -14,10 +14,10 @@ Author: Khaled Al-Shamaa [aut, cre],
   Zakaria Kehel [ctb],
   ICARDA [cph]
 Maintainer: Khaled Al-Shamaa <k.el-shamaa@cgiar.org>
-Description: Query the Breeding Management System 'BMS'
-    <https://bmspro.io> database (using 'BrAPI' <https://brapi.org> calls)
-    to help breeders as targeted end-users retrieving data directly into
-    their analyzing pipelines.
+Description: Query the Breeding Management System(s) like BMS <https://bmspro.io>, 
+    BreeBase <https://breedbase.org>, and GIGWA <https://southgreen.fr/content/gigwa> 
+    (using 'BrAPI' <https://brapi.org> calls) to help breeders as targeted end-users 
+    retrieve phenotypic and genotypic data directly into their analyzing pipelines.
 License: GPL (>= 3)
 URL: https://github.com/icarda-git/QBMS
 BugReports: https://github.com/icarda-git/QBMS/issues
@@ -29,6 +29,6 @@ Encoding: UTF-8
 LazyData: FALSE
 NeedsCompilation: no
 RoxygenNote: 7.1.1
-Packaged: 2022-03-01 22:26:44 UTC; Kel-shamaa
+Packaged: 2022-05-19 00:20:51 UTC; Kel-shamaa
 Repository: CRAN
-Date/Publication: 2022-03-02 15:50:05 UTC
+Date/Publication: 2022-05-19 06:50:15 UTC

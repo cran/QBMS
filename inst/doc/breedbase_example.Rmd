@@ -35,7 +35,7 @@ library(QBMS)
 
 # Cassava BreedBase server
 set_qbms_config("https://cassavabase.org/brapi/v1/calls/", 
-                path = "", time_out = 300, no_auth = TRUE, engine = "breedbase")
+                time_out = 300, no_auth = TRUE, engine = "breedbase")
 
 # list supported crops in the current bms server
 list_crops()
@@ -56,7 +56,7 @@ list_trials()
 set_trial("20_Abuja")
 
 # get observation variable ontology in the selected study/trial
-ontology <- get_trial_obs_ontology()
+get_trial_obs_ontology()
 
 # list all environments/locations information in the selected study/trial
 list_studies()
@@ -64,11 +64,12 @@ list_studies()
 # select a specific environment/location by name
 set_study("20NCRP12yrtAB")
 
-# select a specific study by location name (first match)
-studies <- list_studies()
-set_study(studies[studies$locationName == "Abuja", "studyName"][1])
+# another option, select a specific study by location name (first match)
+# studies <- list_studies()
+# set_study(studies[studies$locationName == "Abuja", "studyName"][1])
 
-# retrieve general information, data, and germplasm list of the selected environment/location
+# retrieve general information, data, and germplasm list 
+# of the selected environment/location
 info <- get_study_info()
 data <- get_study_data()
 germplasm <- get_germplasm_list()

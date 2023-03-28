@@ -10,7 +10,7 @@ vignette: >
 ---
 
 ## QBMS
-Linking data management systems to analytics is an important step in breeding digitalization. Breeders can use this R package to Query the [Breeding Management System](https://bmspro.io/) database (using [BrAPI](https://brapi.org/) calls) and help them to retrieve their experiments data directly into R statistical analyzing environment.
+Linking data management systems to analytics is an important step in breeding digitalization. Breeders can use this R package to Query the Breeding Management System(s) like [BMS](https://bmspro.io/), [BreedBase](https://breedbase.org), and [GIGWA](https://southgreen.fr/content/gigwa) (using [BrAPI](https://brapi.org/) calls) and help them to retrieve phenotypic and genotypic data directly into their analyzing pipelines developed in R statistical environment.
 
 ## GIGWA
 [GIGWA](https://southgreen.fr/content/gigwa) is a web-based tool which provides an easy and intuitive way to explore large amounts of genotyping data by filtering the latter based not only on variant features, including functional annotations, but also on genotype patterns. The data storage relies on MongoDB, which offers good scalability perspectives. GIGWA can handle multiple databases and may be deployed in either single or multi-user mode. Finally, it provides a wide range of popular export formats.
@@ -31,6 +31,7 @@ library(QBMS)
 
 # The public GIGWA testing server required no authentication. If your GIGWA server 
 # requires authentication, then make sure that no_auth parameter value is FALSE
+# IMPORTENT NOTE: QBMS required GIGWA version 2.4.1 or higher
 set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
                 time_out = 300, engine = "gigwa", no_auth = TRUE)
 
@@ -81,15 +82,14 @@ marker_matrix <- gigwa_get_variants(max_missing = 0.2,
 # numerical coding 0, 1, and 2 for reference, heterozygous, alternative/minor alleles.
 head(marker_matrix)
 
-```
-## _Troubleshooting the installation_
+# get the metadata associated with the samples in the current active run
+gigwa_set_db("3kG_10M")
+gigwa_set_project("3003_ind")
+gigwa_set_run("1")
 
-1. If the installation of QBMS generates errors saying that some of the existing packages cannot be removed, you can try to quit any R session, and try to start R in administrator (Windows) or SUDO mode (Linux/Ubuntu) then try installing again.
+# get a list of all samples in the selected run
+metadata <- gigwa_get_metadata()
 
-2. If you get an error related to packages built under a current version of R, and updating your packages doesn’t help, you can consider overriding the error with the following code. _Note: This might help you install QBMS but may result in other problems. If possible, it’s best to resolve the errors rather than ignoring them._
+View(metadata)
 
-```r
-Sys.setenv("R_REMOTES_NO_ERRORS_FROM_WARNINGS" = TRUE)
-
-remotes::install_github("icarda-git/QBMS", upgrade = "always")
 ```

@@ -3,6 +3,7 @@ qbms_globals <- new.env()
 qbms_globals$config <- list(crop = NULL)
 qbms_globals$state  <- list(token = NULL)
 
+
 #' Combine data.frames by row, filling in missing columns
 #'
 #' @description
@@ -22,6 +23,7 @@ rbindx <- function(..., dfs = list(...)) {
   }))
 }
 
+
 #' Makes one data.table from a list of many
 #'
 #' @description
@@ -38,6 +40,7 @@ rbindlistx <- function(x) {
   names(l) <- un
   d <- as.data.frame(l)
 }
+
 
 #' Debug internal QBMS status object
 #'
@@ -56,6 +59,118 @@ debug_qbms <- function() {
   return(qbms_globals)
 }
 
+
+#' Get the QBMS connection
+#'
+#' @description
+#' Get the QBMS connection object from the current environment
+#'
+#' @return a list of the current connection config and status
+#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @seealso \code{\link{set_qbms_connection}}
+#' @examples
+#' if(interactive()) {
+#' # configure QBMS to connect the phenotypics server
+#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench/controller/auth/login")
+#' 
+#' # login, set the crop, and program
+#' login_bms()
+#' set_crop("maize")
+#' set_program("MC Maize")
+#' 
+#' # get germplasm data
+#' df1 <- get_germplasm_data("BASFCORN-2-1")
+#' 
+#' # save current connection (phenotypic server)
+#' con1 <- get_qbms_connection()
+#' 
+#' # configure QBMS to connect the genotypic server
+#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", engine = "gigwa", no_auth = TRUE)
+#' 
+#' # set the db, project, and run
+#' gigwa_set_db("3kG_10M")
+#' gigwa_set_project("3003_ind")
+#' gigwa_set_run("1")
+#' 
+#' # get associated metadata
+#' df2 <- gigwa_get_metadata()
+#' 
+#' # save current connection (before switch)
+#' con2 <- get_qbms_connection()
+#' 
+#' # load the saved phenotypic server connection
+#' set_qbms_connection(con1)
+#' 
+#' # continue retrieving germplasm attributes from the phenotypic server
+#' df3 <- get_germplasm_attributes("BASFCORN-2-1")
+#' }
+#' @export
+
+get_qbms_connection <- function() {
+  return(as.list(qbms_globals))
+}
+
+
+#' Set the QBMS connection
+#'
+#' @description
+#' Set the QBMS connection object to the current environment
+#'
+#' @param env a list of the connection config and status to load
+#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @seealso \code{\link{get_qbms_connection}}
+#' @examples
+#' if(interactive()) {
+#' # configure QBMS to connect the phenotypics server
+#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench/controller/auth/login")
+#' 
+#' # login, set the crop, and program
+#' login_bms()
+#' set_crop("maize")
+#' set_program("MC Maize")
+#' 
+#' # get germplasm data
+#' df1 <- get_germplasm_data("BASFCORN-2-1")
+#' 
+#' # save current connection (phenotypic server)
+#' con1 <- get_qbms_connection()
+#' 
+#' # configure QBMS to connect the genotypic server
+#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", engine = "gigwa", no_auth = TRUE)
+#' 
+#' # set the db, project, and run
+#' gigwa_set_db("3kG_10M")
+#' gigwa_set_project("3003_ind")
+#' gigwa_set_run("1")
+#' 
+#' # get associated metadata
+#' df2 <- gigwa_get_metadata()
+#' 
+#' # save current connection (before switch)
+#' con2 <- get_qbms_connection()
+#' 
+#' # load the saved phenotypic server connection
+#' set_qbms_connection(con1)
+#' 
+#' # continue retrieving germplasm attributes from the phenotypic server
+#' df3 <- get_germplasm_attributes("BASFCORN-2-1")
+#' }
+#' @export
+
+set_qbms_connection <- function(env) {
+  qbms_globals$config <- list(crop = NULL)
+  qbms_globals$state  <- list(token = NULL)
+  
+  if (!is.null(env$config)) {
+    qbms_globals$config <- env$config
+  }
+  
+  if (!is.null(env$state)) {
+    qbms_globals$state <- env$state
+  }
+}
+
+
 #' Configure BMS server settings
 #'
 #' @description
@@ -67,6 +182,7 @@ debug_qbms <- function() {
 #' @param time_out  Number of seconds to wait for a response until giving up (default is 10)
 #' @param no_auth   TRUE if the server doesn't require authentication/login (default is FALSE)
 #' @param engine    Backend database (qbms default, breedbase, gigwa)
+#' @param verbose   Logical indicating if progress bar will display on the console when retrieve data from API (TRUE by default).
 #' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
 #' @return no return value
 #' @examples
@@ -75,13 +191,16 @@ debug_qbms <- function() {
 
 set_qbms_config <- function(url = "http://localhost/ibpworkbench/controller/auth/login",
                             path = NULL, page_size = 1000, time_out = 120,
-                            no_auth = FALSE, engine = "bms") {
-
+                            no_auth = FALSE, engine = "bms", verbose = TRUE) {
+  
   if (is.null(path)) {
     if (engine == "bms") { path = "bmsapi" }
     if (engine == "breedbase") { path = "" }
     if (engine == "gigwa") { path = "gigwa/rest"}
   }
+  
+  qbms_globals$config <- list(crop = NULL)
+  qbms_globals$state  <- list(token = NULL)
   
   qbms_globals$config$server    <- regmatches(url, regexpr("^(?://|[^/]+)*", url))
   qbms_globals$config$path      <- path
@@ -89,10 +208,73 @@ set_qbms_config <- function(url = "http://localhost/ibpworkbench/controller/auth
   qbms_globals$config$time_out  <- time_out
   qbms_globals$config$base_url  <- paste0(qbms_globals$config$server, "/", qbms_globals$config$path)
   qbms_globals$config$engine    <- engine
+  qbms_globals$config$verbose   <- verbose
 
   if (no_auth == TRUE) {
     qbms_globals$state$token <- NA
   }
+  
+  qbms_globals$state$crops <- NULL
+}
+
+
+#' Common HTTP headers to send
+#'
+#' @description
+#' Build the list of common HTTP headers to send with each API call
+#'
+#' @return A list of common HTTP headers to send.
+
+brapi_headers <- function() {
+  auth_code <- paste0("Bearer ", qbms_globals$state$token)
+  headers   <- c("Authorization" = auth_code, "Accept-Encoding" = "gzip, deflate")
+
+  headers
+}
+
+
+#' Async version of HTTP GET request
+#'
+#' @description
+#' A small helper function to create `async` version of the original HTTP GET request.
+#'
+#' @param full_url URL to retrieve
+#' @param nested   Don't flatten nested data.frames
+#' @return Async version of HTTP GET request.
+
+get_async_page <- function(full_url, nested) {
+}
+
+if (requireNamespace("async", quietly = TRUE)) {
+  get_async_page <- async::async(function(full_url, nested) {
+    async::http_get(full_url, headers = brapi_headers())$
+      then(async::http_stop_for_status)$
+      then(function(resp) {
+        jsonlite::fromJSON(rawToChar(resp$content), flatten = !nested)
+      })
+  })
+}
+
+
+#' Run all supplied pages
+#'
+#' @description
+#' A small helper function to create a deferred value that is resolved when all 
+#' listed pages are resolved.
+#'
+#' @param pages  List of URLs to retrieve
+#' @param nested Don't flatten nested data.frames
+#' @return Async deferred object.
+
+get_async_pages <- function(pages, nested) {
+}
+
+if (requireNamespace("async", quietly = TRUE)) {
+  get_async_pages <- async::async(function(pages, nested) {
+    reqs <- lapply(pages, get_async_page, nested)
+    async::when_all(.list = reqs)$
+      then(function(x) x)
+  })
 }
 
 
@@ -104,32 +286,101 @@ set_qbms_config <- function(url = "http://localhost/ibpworkbench/controller/auth
 #' care of pagination, authentication, encoding, compress, decode JSON response, etc.
 #'
 #' @param call_url BrAPI URL to call in GET method
-#' @param page     Page number to retrieve in case of multi-paged results (default is 0)
 #' @param nested   If FALSE, then retrieved JSON data will be flatten (default is TRUE)
 #' @return result object returned by JSON API response
 #' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
 
-brapi_get_call <- function(call_url, page = 0, nested = TRUE) {
+brapi_get_call <- function(call_url, nested = TRUE) {
   separator <- if (grepl("\\?", call_url)) "&" else "?"
-  full_url  <- paste0(call_url, separator, "page=", page, "&pageSize=", qbms_globals$config$page_size)
-
-  auth_code <- paste0("Bearer ", qbms_globals$state$token)
-  headers   <- c("Authorization" = auth_code, "Accept-Encoding" = "gzip, deflate")
-
-  response  <- httr::GET(url = utils::URLencode(full_url),
-                         httr::add_headers(headers),
-                         httr::timeout(qbms_globals$config$time_out))
-
+  full_url  <- paste0(call_url, separator, "page=0&pageSize=", qbms_globals$config$page_size)
+  
+  headers  <- brapi_headers()
+  response <- httr::GET(url = utils::URLencode(full_url),
+                        httr::add_headers(headers),
+                        httr::timeout(qbms_globals$config$time_out))
+  
   result_object <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = !nested)
-  result_info   <- result_object$result
+  result_data   <- as.data.frame(result_object$result$data)
+  
+  if (result_object$metadata$pagination$totalPages > 1 && is.null(result_object$errors)) {
+    last_page <- result_object$metadata$pagination$totalPages - 1
+    
+    if (qbms_globals$config$verbose) {
+      pb      <- utils::txtProgressBar(min = 0, max = last_page + 1, initial = 0, style = 3)
+      pb_step <- 1
+      utils::setTxtProgressBar(pb, 1)
+    }
+    
+    for (n in 1:last_page) {
+      full_url <- paste0(call_url, separator, "page=", n, "&pageSize=", qbms_globals$config$page_size)
+      response <- httr::GET(url = utils::URLencode(full_url),
+                            httr::add_headers(headers),
+                            httr::timeout(qbms_globals$config$time_out))
+      
+      result_object <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = !nested)
+      result_data   <- rbindx(result_data, as.data.frame(result_object$result$data))
+      
+      # update the progress bar
+      if (qbms_globals$config$verbose) { utils::setTxtProgressBar(pb, n + 1) }
+    }
+    
+    if (qbms_globals$config$verbose) {
+      utils::setTxtProgressBar(pb, last_page + 1)
+      close(pb)
+    }
+  }
 
+  if (ncol(result_data) == 1) {
+    result_object$result$data <- result_data[,1]
+  } else {
+    result_object$result$data <- result_data
+  }
+  
+  result_data <- result_object$result
+  
   qbms_globals$state$current_page <- result_object$metadata$pagination$currentPage
   qbms_globals$state$page_size    <- result_object$metadata$pagination$pageSize
   qbms_globals$state$total_count  <- result_object$metadata$pagination$totalCount
   qbms_globals$state$total_pages  <- result_object$metadata$pagination$totalPages
   qbms_globals$state$errors       <- result_object$errors
 
-  return(result_info)
+  return(result_data)
+}
+
+if (requireNamespace("async", quietly = TRUE)) {
+  brapi_get_call <- function(call_url, nested = TRUE) {
+    separator <- if (grepl("\\?", call_url)) "&" else "?"
+    full_url  <- paste0(call_url, separator, "page=0&pageSize=", qbms_globals$config$page_size)
+    
+    result_object <- async::synchronise(get_async_page(full_url, nested))
+    result_data   <- as.data.frame(result_object$result$data)
+    total_pages   <- result_object$metadata$pagination$totalPages
+    if (total_pages > 1) {
+      pages <- c(seq(1, total_pages - 1))
+      full_urls <- paste0(call_url, separator, "page=", pages, "&pageSize=", qbms_globals$config$page_size)
+      all_pages <- async::synchronise(get_async_pages(full_urls, nested))
+
+      for (n in 1:(total_pages - 1)) {
+        result_data <- rbindx(result_data, as.data.frame(all_pages[[n]]$result$data))
+      }
+    }
+  
+    if (ncol(result_data) == 1) {
+      result_object$result$data <- result_data[,1]
+    } else {
+      result_object$result$data <- result_data
+    }
+    
+    result_data <- result_object$result
+    
+    qbms_globals$state$current_page <- result_object$metadata$pagination$currentPage
+    qbms_globals$state$page_size    <- result_object$metadata$pagination$pageSize
+    qbms_globals$state$total_count  <- result_object$metadata$pagination$totalCount
+    qbms_globals$state$total_pages  <- result_object$metadata$pagination$totalPages
+    qbms_globals$state$errors       <- result_object$errors
+    
+    return(result_data)
+  }
 }
 
 
@@ -141,6 +392,10 @@ brapi_get_call <- function(call_url, page = 0, nested = TRUE) {
 #' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
 
 get_login_details <- function() {
+  if (is.null(qbms_globals$config$engine)) {
+    stop("No server has been defined yet! You have to set your server configurations first using the `set_qbms_config()` function")
+  }
+  
   if (qbms_globals$config$engine == "bms") { server <- "BMS" }
   if (qbms_globals$config$engine == "breedbase") { server <- "BreedBase" }
   if (qbms_globals$config$engine == "gigwa") { server <- "GIGWA" }
@@ -251,14 +506,19 @@ login_bms <- function(username = NULL, password = NULL) {
 
 list_crops <- function() {
   if (is.null(qbms_globals$state$token)) {
-    stop("No server has been connected yet! You have to connect a server first using the `bms_login()` function")
+    stop("No server has been connected yet! You have to connect a server first using the `login_bms()` function")
   }
 
-  call_url <- paste0(qbms_globals$config$base_url, "/brapi/v1/crops")
+  if (!is.null(qbms_globals$state$crops)) {
+    bms_crops <- qbms_globals$state$crops
+  } else {
+    call_url  <- paste0(qbms_globals$config$base_url, "/brapi/v1/crops")
+    bms_crops <- brapi_get_call(call_url)$data
 
-  bms_crops <- brapi_get_call(call_url)
+    qbms_globals$state$crops <- bms_crops
+  }
 
-  return(bms_crops$data)
+  return(bms_crops)
 }
 
 
@@ -297,6 +557,9 @@ set_crop <- function(crop_name) {
   } else {
     qbms_globals$config$crop <- crop_name
   }
+  
+  qbms_globals$state$programs  <- NULL
+  qbms_globals$state$locations <- NULL
 }
 
 
@@ -328,23 +591,29 @@ set_crop <- function(crop_name) {
 
 list_programs <- function() {
   if (is.null(qbms_globals$state$token)) {
-    stop("No server has been connected yet! You have to connect a server first using the `bms_login()` function")
+    stop("No server has been connected yet! You have to connect a server first using the `login_bms()` function")
   }
 
   if (is.null(qbms_globals$config$crop)) {
     stop("No crop has been selected yet! You have to set your crop first using the `set_crop()` function")
   }
 
-  call_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop, "/brapi/v1/programs")
-
-  bms_programs <- brapi_get_call(call_url)
-
-  if (qbms_globals$config$engine == "breedbase") {
-    bms_programs <- bms_programs$data[c("programName")]
+  if (!is.null(qbms_globals$state$programs)) {
+    bms_programs <- as.data.frame(qbms_globals$state$programs[, 1])
   } else {
-    bms_programs <- bms_programs$data[c("name")]
-  }
+    call_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop, "/brapi/v1/programs")
+    
+    results <- brapi_get_call(call_url)$data
+    
+    if (qbms_globals$config$engine == "breedbase") {
+      bms_programs <- results[c("programName")]
+    } else {
+      bms_programs <- results[c("name")]
+    }
 
+    qbms_globals$state$programs <- cbind(bms_programs, results[c("programDbId")])
+  }
+  
   return(bms_programs)
 }
 
@@ -383,17 +652,11 @@ set_program <- function(program_name) {
     stop("Your breeding program name is not exists in this crop database! You may use the `list_programs()` function to check the available breeding programs")
   }
 
-  call_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop, "/brapi/v1/programs")
+  program_row <- which(qbms_globals$state$programs[,1] == program_name)
 
-  bms_programs <- brapi_get_call(call_url)
-
-  if (qbms_globals$config$engine == "breedbase") {
-    program_row <- which(bms_programs$data$programName == program_name)
-  } else {
-    program_row <- which(bms_programs$data$name == program_name)
-  }
-
-  qbms_globals$state$program_db_id <- bms_programs$data[program_row, "programDbId"]
+  qbms_globals$state$program_db_id <- qbms_globals$state$programs[program_row, "programDbId"]
+  
+  qbms_globals$state$trials <- NULL
 }
 
 
@@ -410,21 +673,17 @@ set_program <- function(program_name) {
 #' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{list_trials}}
 
 get_program_trials <- function() {
-  call_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop,
-                     "/brapi/v1/trials?programDbId=", qbms_globals$state$program_db_id)
-
-  bms_crop_trials <- brapi_get_call(call_url, 0, FALSE)
-
-  bms_program_trials <- bms_crop_trials$data
-
-  if (qbms_globals$state$total_pages > 1 && is.null(qbms_globals$state$errors)) {
-    last_page <- qbms_globals$state$total_pages - 1
-    for (n in 1:last_page) {
-      bms_crop_trials    <- brapi_get_call(call_url, n, FALSE)
-      bms_program_trials <- rbindx(bms_program_trials, bms_crop_trials$data)
-    }
+  if (!is.null(qbms_globals$state$trials)) {
+    bms_program_trials <- qbms_globals$state$trials
+  } else {
+    call_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop,
+                       "/brapi/v1/trials?programDbId=", qbms_globals$state$program_db_id)
+  
+    bms_program_trials <- brapi_get_call(call_url, FALSE)$data
+    
+    qbms_globals$state$trials <- bms_program_trials
   }
-
+  
   return(bms_program_trials)
 }
 
@@ -535,6 +794,8 @@ set_trial <- function(trial_name) {
   trial_row <- which(bms_trials$trialName == trial_name)[1]
 
   qbms_globals$state$trial_db_id <- as.character(bms_trials[trial_row, c("trialDbId")])
+  
+  qbms_globals$state$studies <- NULL
 }
 
 
@@ -573,13 +834,19 @@ list_studies <- function() {
   if (is.null(qbms_globals$state$trial_db_id)) {
     stop("No trial has been selected yet! You have to set your trial first using the `set_trial()` function")
   }
-
-  bms_trials <- get_program_trials()
-
-  trial_row <- which(bms_trials$trialDbId == qbms_globals$state$trial_db_id)
-
-  studies <- bms_trials[trial_row, c("studies")][[1]][, c("studyName", "locationName")]
-
+  
+  if (!is.null(qbms_globals$state$studies)) {
+    studies <- qbms_globals$state$studies
+  } else {
+    bms_trials <- get_program_trials()
+    
+    trial_row <- which(bms_trials$trialDbId == qbms_globals$state$trial_db_id)
+    
+    studies <- bms_trials[trial_row, c("studies")][[1]][, c("studyName", "locationName")]
+    
+    qbms_globals$state$studies <- studies
+  }
+  
   return(studies)
 }
 
@@ -681,9 +948,17 @@ get_study_info <- function() {
   call_url <- paste0(crop_url, "/studies/", qbms_globals$state$study_db_id)
 
   study_info <- brapi_get_call(call_url)
-  study_info <- as.data.frame(t(as.matrix(do.call(c, unlist(study_info, recursive = FALSE)))))
+  
+  if (is.null(study_info)) {
+    study_info_df <- NULL
+  } else {
+    study_info_df <- as.data.frame(t(as.matrix(do.call(c, unlist(study_info, recursive = FALSE)))))
+    
+    # study_info_df <- data.frame(study_info[, 1])
+    # for(i in 2:ncol(study_info)) study_info_df[, i] <- study_info[, i]
+  }
 
-  return(study_info)
+  return(study_info_df)
 }
 
 
@@ -731,19 +1006,19 @@ get_study_data <- function() {
   call_url <- paste0(crop_url, "/studies/", qbms_globals$state$study_db_id, "/table")
 
   study_result <- brapi_get_call(call_url)
-
+  
   if (qbms_globals$config$engine == "breedbase") {
     study_data <- as.data.frame(study_result$data[-1, ])
     colnames(study_data) <- study_result$data[1, ]
   } else {
     study_data <- as.data.frame(study_result$data)
   }
-
+  
   study_header <- c(study_result$headerRow, study_result$observationVariableNames)
   if (nrow(study_data) > 0) {
     colnames(study_data) <- study_header
   }
-
+  
   return(study_data)
 }
 
@@ -791,16 +1066,7 @@ get_germplasm_list <- function() {
   crop_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop, "/brapi/v1")
   call_url <- paste0(crop_url, "/studies/", qbms_globals$state$study_db_id, "/germplasm")
 
-  germplasms     <- brapi_get_call(call_url)
-  germplasm_list <- as.data.frame(germplasms$data)
-
-  if (qbms_globals$state$total_pages > 1 && is.null(qbms_globals$state$errors)) {
-    last_page <- qbms_globals$state$total_pages - 1
-    for (n in 1:last_page) {
-      germplasms     <- brapi_get_call(call_url, n)
-      germplasm_list <- rbindx(germplasm_list, as.data.frame(germplasms$data))
-    }
-  }
+  germplasm_list <- brapi_get_call(call_url)$data
 
   if (qbms_globals$config$engine == "breedbase") {
     germplasm_list$check <- NA
@@ -815,7 +1081,7 @@ get_germplasm_list <- function() {
                            httr::add_headers(c("X-Auth-Token" = qbms_globals$state$token), "Accept-Encoding" = "gzip, deflate"),
                            httr::timeout(qbms_globals$config$time_out))
 
-    results <- jsonlite::fromJSON(httr::content(response, as = "text"), flatten = TRUE)
+    results <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = TRUE)
 
     germplasm_list <- merge(germplasm_list, results[, c("entryNumber", "properties.8255.value")], by = "entryNumber")
 
@@ -921,7 +1187,7 @@ get_trial_obs_ontology <- function() {
 
     colnames(ontology) <- "observationVariableNames"
   } else {
-    study_obs  <- study_data$observationVariableDbIds
+    study_obs <- study_data$observationVariableDbIds
 
     my_url <- paste0(qbms_globals$config$base_url, "/crops/", qbms_globals$config$crop,
                      "/variables/filter?programUUID=", qbms_globals$state$program_db_id,
@@ -931,7 +1197,7 @@ get_trial_obs_ontology <- function() {
                           httr::add_headers("X-Auth-Token" = qbms_globals$state$token, "Accept-Encoding" = "gzip, deflate"),
                           httr::timeout(qbms_globals$config$time_out))
 
-    ontology <- jsonlite::fromJSON(httr::content(response, as = "text"), flatten = TRUE)
+    ontology <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = TRUE)
   }
 
   return(ontology)
@@ -948,26 +1214,24 @@ get_trial_obs_ontology <- function() {
 #' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
 #' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}
 
-get_crop_locations <- function() {
+list_locations <- function() {
   if (is.null(qbms_globals$config$crop)) {
     stop("No crop has been selected yet! You have to set your crop first using the `set_crop()` function")
   }
+  
+  if (!is.null(qbms_globals$state$locations)) {
+    location_list <- qbms_globals$state$locations
+  } else {
+    call_url  <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop, "/brapi/v1/locations")
+    
+    location_list <- brapi_get_call(call_url, FALSE)$data
 
-  call_url  <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop, "/brapi/v1/locations")
-  locations <- brapi_get_call(call_url, 0, FALSE)
-
-  location_list <- as.data.frame(locations$data)
-
-  if (qbms_globals$state$total_pages > 1 && is.null(qbms_globals$state$errors)) {
-    last_page <- qbms_globals$state$total_pages - 1
-    for (n in 1:last_page) {
-      locations     <- brapi_get_call(call_url, n, FALSE)
-      location_list <- rbindx(location_list, as.data.frame(locations$data))
-    }
+    qbms_globals$state$locations <- location_list
   }
 
   return(location_list)
 }
+
 
 #' Get the list of trials studies locations information of the current selected program
 #'
@@ -1024,9 +1288,9 @@ get_program_studies <- function() {
   }
 
   # remove locationDbId, active, studies, and locationName columns coming from the trial data.frame
-  studies <- studies[, -c(6, 7, 8, 14)]
+  studies <- studies[, -c(6:8, ncol(studies))]
 
-  crop_locations <- get_crop_locations()
+  crop_locations <- list_locations()
 
   studies <- merge(studies, crop_locations, by = "locationDbId", all.x = TRUE, all.y = FALSE)
 
@@ -1047,7 +1311,7 @@ get_program_studies <- function() {
                           httr::add_headers("X-Auth-Token" = qbms_globals$state$token, "Accept-Encoding" = "gzip, deflate"),
                           httr::timeout(qbms_globals$config$time_out))
     
-    metadata <- jsonlite::fromJSON(httr::content(response, as = "text"), flatten = TRUE)
+    metadata <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = TRUE)
 
     studies[studies$trialDbId == all_trials[i], "testEntriesCount"] <- metadata$testEntriesCount
     studies[studies$trialDbId == all_trials[i], "checkEntriesCount"] <- metadata$checkEntriesCount
@@ -1063,16 +1327,55 @@ get_program_studies <- function() {
 }
 
 
-#' Get the observations data of a given germplasm name
+#' Get Germplasm ID
+#'
+#' @description 
+#' Get the germplasm id for the given germplasm name in the current crop
+#'
+#' @param germplasm_name the name of the germplasm
+#' @return a string of the germplasm id
+#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @seealso \code{\link{set_crop}}, \code{\link{get_germplasm_data}}, \code{\link{get_germplasm_attributes}}
+
+get_germplasm_id <- function(germplasm_name = "") {
+  if (germplasm_name == "") {
+    stop("The germplasm name parameter value is missing!")
+  }
+  
+  if (is.null(qbms_globals$config$crop)) {
+    stop("No crop has been selected yet! You have to set your crop first using the `set_crop()` function")
+  }
+  
+  crop_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop, "/brapi/v1")
+  call_url <- paste0(crop_url, "/germplasm?germplasmName=", germplasm_name)
+  
+  # this BrAPI call return all germplasm records start with the given name NOT exactly match!
+  results <- brapi_get_call(call_url)$data
+  
+  if (length(results) == 0) {
+    stop("No germplasm in this crop database start with your filtering name!")
+  }
+  
+  germplasm_db_id <- results[results$germplasmName == germplasm_name, "germplasmDbId"]
+  
+  if (length(germplasm_db_id) == 0) {
+    stop("No germplasm in this crop database match your filtering name!")
+  }
+  
+  return(germplasm_db_id)
+}
+
+
+#' Get the observations data of a given germplasm name in a crop
 #'
 #' @description
-#' This function will retrieve the observations data of the current active study
-#' as configured in the internal state object using `set_study()` function.
+#' This function will retrieve all the observations data available for a given germplasm
+#' in the current crop database regardless of the programs/trials nested structure.
 #'
 #' @param germplasm_name the name of the germplasm
 #' @return a data frame of the germplasm observations data aggregate from all trials
 #' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}
+#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{get_germplasm_attributes}}
 #' @examples
 #' if(interactive()) {
 #' # config your BMS connection
@@ -1092,21 +1395,18 @@ get_program_studies <- function() {
 #' }
 #' @export
 
-get_germplasm_data <- function(germplasm_name) {
+get_germplasm_data <- function(germplasm_name = "") {
   if (qbms_globals$config$engine == "breedbase") {
     stop("This function is not supported yet in BreedBase!")
   }
-
-  crop_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop, "/brapi/v1")
-  call_url <- paste0(crop_url, "/germplasm?germplasmName=", germplasm_name)
-
-  results <- brapi_get_call(call_url)$data
-  germplasm_db_id <- results[results$germplasmName == germplasm_name, "germplasmDbId"]
+  
+  germplasm_db_id <- get_germplasm_id(germplasm_name)
 
   # https://github.com/plantbreeding/API/blob/V1.2/Specification/Phenotypes/PhenotypesSearch_POST.md
   # Note 1: It does not work with germplasm name (BrAPI specifications): e.g. {"germplasmDbIds": ["ILC 3279"]}
   # Note 2: Return "Invalid request body" if we search for one germplasm_db_id!
 
+  crop_url  <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop, "/brapi/v1")
   call_url  <- paste0(crop_url, "/phenotypes-search")
   call_body <- list(germplasmDbIds = c(germplasm_db_id, ""), observationLevel = "PLOT")
   auth_code <- paste0("Bearer ", qbms_globals$state$token)
@@ -1118,9 +1418,10 @@ get_germplasm_data <- function(germplasm_name) {
   results <- httr::content(response)$result$data
 
   flatten_results <- jsonlite::fromJSON(jsonlite::toJSON(results), flatten = TRUE)
-
-  # unlist nested list with id
-  #unlisted_observations <- data.table::rbindlist(flatten_results$observations, fill = TRUE, idcol = "id")
+  
+  if (length(flatten_results) == 0) {
+    stop("No observation data available in this crop database for the given germplasm!")
+  }
 
   unlisted_observations    <- rbindx(flatten_results$observations[[1]])
   unlisted_observations$id <- 1
@@ -1153,12 +1454,55 @@ get_germplasm_data <- function(germplasm_name) {
     results_df[, i] <- unlist(temp)
   }
 
-  crop_locations <- get_crop_locations()
+  crop_locations <- list_locations()
   results_df <- merge(results_df, crop_locations, by.x = "studyLocationDbId", by.y = "locationDbId", all.x = TRUE)
 
   return(results_df)
 }
 
+
+#' Get germplasm attributes for a given germplasm in a crop
+#'
+#' @param germplasm_name the name of the germplasm
+#' @return a data frame of the germplasm attributes
+#' @author Johan Steven Aparicio, \email{j.aparicio@cgiar.org}
+#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{get_germplasm_data}}
+#' @examples
+#' if(interactive()) {
+#' # config your BMS connection
+#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#'
+#' # login using your BMS account (interactive mode)
+#' # you can pass BMS username and password as parameters (batch mode)
+#' login_bms()
+#'
+#' set_crop("maize")
+#'
+#' # select a breeding program by name
+#' set_program("MC Maize")
+#'
+#' # retrive attributes data of a given germplasm in a crop
+#' germplasm_attributes <- get_germplasm_attributes("BASFCORN-2-1")
+#' }
+#' @export
+
+get_germplasm_attributes <- function(germplasm_name = "") {
+  if (qbms_globals$config$engine == "breedbase") {
+    stop("This function is not supported yet in BreedBase!")
+  }
+  
+  germplasm_db_id <- get_germplasm_id(germplasm_name)
+  
+  crop_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop)
+  call_url <- paste0(crop_url, "/brapi/v1/germplasm/", germplasm_db_id, "/attributes")
+  
+  results <- brapi_get_call(call_url)$data
+
+  return(results)
+}
+
+
+## Pedigree ###############################################################################
 
 #' Get Direct Parents
 #'
@@ -1180,21 +1524,21 @@ get_parents <- function(pedigree) {
   if (length(cross[[1]]) != 0) {
     # find the highest cross order to cut at it and get parents sub-pedigree
     last_cross <- max(as.numeric(gsub("/", "", cross[[1]])))
-    parents    <- strsplit(pedigree, paste0("/", last_cross, "/"))[[1]]
+    parents    <- regmatches(pedigree, regexpr(paste0("/", last_cross, "/"), pedigree), invert = TRUE)[[1]]
   } else {
     # 2. if it is not of type /#/, then try double backslash //
     cross <- regmatches(pedigree, gregexpr("//", pedigree))
 
     if (length(cross[[1]]) != 0) {
       # get parents sub-pedigree if it is crossed using //
-      parents <- strsplit(pedigree, "//")[[1]]
+      parents <- regmatches(pedigree, regexpr("//", pedigree), invert = TRUE)[[1]]
     } else {
       # 3. if it is not // then try with single backslash /
       cross <- regmatches(pedigree, gregexpr("/", pedigree))
 
       if (length(cross[[1]]) != 0) {
         # get parents names
-        parents <- strsplit(pedigree, "/")[[1]]
+        parents <- regmatches(pedigree, regexpr("/", pedigree), invert = TRUE)[[1]]
       } else {
         # 4. else, there is no more cross info in this pedigree, so parents are unknown
         parents <- c(NA, NA)
@@ -1238,8 +1582,8 @@ build_pedigree_table <- function(geno_list = NULL, pedigree_list = NULL, pedigre
     pedigree_df   <- data.frame(Variety = factor(), Female = factor(), Male = factor())
 
     # make sure that all strings of genotype/germplasm and pedigree lists are in small letters (needs only first time)
-    geno_list     <- tolower(geno_list)
-    pedigree_list <- tolower(pedigree_list)
+    geno_list     <- tolower(iconv(geno_list, 'WINDOWS-1252', 'UTF-8'))
+    pedigree_list <- tolower(iconv(pedigree_list, 'WINDOWS-1252', 'UTF-8'))
   }
 
   # create an empty dummy list of previous generation parents
@@ -1251,6 +1595,29 @@ build_pedigree_table <- function(geno_list = NULL, pedigree_list = NULL, pedigre
     cross   <- as.character(pedigree_list[i])
     parents <- get_parents(cross)
 
+    # check for backcross cases and handle them properly
+    female_bc <- regmatches(parents[1], regexec("(.+)\\*(\\d+)$", parents[1]))
+
+    if (length(female_bc[[1]]) != 0) {
+      n <- as.numeric(female_bc[[1]][3])
+      if (n > 2) {
+        parents <- c(female_bc[[1]][2], sub(parents[1], paste0(female_bc[[1]][2], "*", n - 1), cross, fixed = TRUE))
+      } else {
+        parents <- c(female_bc[[1]][2], sub(parents[1], female_bc[[1]][2], cross, fixed = TRUE))
+      }
+    } else {
+      male_bc <- regmatches(parents[2], regexec("^(\\d+)\\*(.+)", parents[2]))
+      
+      if (length(male_bc[[1]]) != 0) {
+        n <- as.numeric(male_bc[[1]][2])
+        if (n > 2) {
+          parents <- c(sub(parents[2], paste0(n - 1, "*", male_bc[[1]][3]), cross, fixed = TRUE), male_bc[[1]][3])
+        } else {
+          parents <- c(sub(parents[2], male_bc[[1]][3], cross, fixed = TRUE), male_bc[[1]][3])
+        }
+      }
+    }
+    
     # update the pedigree data.frame and dummy list of previous generation parents
     pedigree_df     <- rbind(c(geno, parents), pedigree_df)
     prev_generation <- c(prev_generation, parents)
@@ -1366,22 +1733,25 @@ get_pedigree_table <- function(data, geno_column = "germplasmName", pedigree_col
   # replace index by the genotype name
   check <- cbind(roots[check[, 1]], roots[check[, 2]])
 
-  # for each pair of similar genotype names
-  for (i in 1:nrow(check)) {
-    # go through all letters of the given pair
-    for (j in 1:max(nchar(check[i, ]))) {
-      # if the given letters in the j offset are same, then move to the next letter
-      if (substr(check[i, 1], j, j) == substr(check[i, 2], j, j)) next
-
-      # if they are not the same, then check
-      # if the different letter is one of this group: <space>, -, _, .
-      # then update the geno_list and pedigree_list to be the same
-      if (substr(check[i, 1], j, j) %in% c(" ", "-", "_", ".")) {
-        geno_list     <- gsub(check[i, 2], check[i, 1], geno_list,     ignore.case = TRUE)
-        pedigree_list <- gsub(check[i, 2], check[i, 1], pedigree_list, ignore.case = TRUE)
-      } else if (substr(check[i, 2], j, j) %in% c(" ", "-", "_", ".")) {
-        geno_list     <- gsub(check[i, 1], check[i, 2], geno_list,     ignore.case = TRUE)
-        pedigree_list <- gsub(check[i, 1], check[i, 2], pedigree_list, ignore.case = TRUE)
+  # if there are cases of similar genotype names
+  if (nrow(check) > 0) {
+    # for each pair of similar genotype names
+    for (i in 1:nrow(check)) {
+      # go through all letters of the given pair
+      for (j in 1:max(nchar(check[i, ]))) {
+        # if the given letters in the j offset are same, then move to the next letter
+        if (substr(check[i, 1], j, j) == substr(check[i, 2], j, j)) next
+        
+        # if they are not the same, then check
+        # if the different letter is one of this group: <space>, -, _, .
+        # then update the geno_list and pedigree_list to be the same
+        if (substr(check[i, 1], j, j) %in% c(" ", "-", "_", ".")) {
+          geno_list     <- gsub(check[i, 2], check[i, 1], geno_list,     ignore.case = TRUE)
+          pedigree_list <- gsub(check[i, 2], check[i, 1], pedigree_list, ignore.case = TRUE)
+        } else if (substr(check[i, 2], j, j) %in% c(" ", "-", "_", ".")) {
+          geno_list     <- gsub(check[i, 1], check[i, 2], geno_list,     ignore.case = TRUE)
+          pedigree_list <- gsub(check[i, 1], check[i, 2], pedigree_list, ignore.case = TRUE)
+        }
       }
     }
   }
@@ -1392,7 +1762,8 @@ get_pedigree_table <- function(data, geno_column = "germplasmName", pedigree_col
   return(pedigree_df)
 }
 
-###########################################################################################
+
+## GIGWA ##################################################################################
 
 #' Login to the GIGWA server
 #'
@@ -1443,6 +1814,7 @@ login_gigwa <- function(username = NULL, password = NULL) {
   qbms_globals$state$token <- httr::content(response)$token
 }
 
+
 #' Get the list of existing databases in the current GIGWA server
 #'
 #' @return a list of existing databases
@@ -1466,10 +1838,11 @@ gigwa_list_dbs <- function() {
   
   call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/programs")
   
-  gigwa_dbs <- brapi_get_call(call_url)
+  gigwa_dbs <- brapi_get_call(call_url)$data
   
-  return(gigwa_dbs$data)
+  return(gigwa_dbs)
 }
+
 
 #' Set the current active GIGWA database by name
 #'
@@ -1500,7 +1873,10 @@ gigwa_set_db <- function(db_name) {
   }
   
   qbms_globals$config$db <- db_name
+  
+  qbms_globals$state$gigwa_projects <- NULL
 }
+
 
 #' Get the list of all projects in the selected GIGWA database
 #'
@@ -1535,14 +1911,21 @@ gigwa_list_projects <- function() {
     stop("No database has been selected yet! You have to set your database first using the `gigwa_set_db()` function")
   }
   
-  call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/studies?programDbId=", qbms_globals$config$db)
-  
-  gigwa_projects <- brapi_get_call(call_url)
-  
-  gigwa_projects <- gigwa_projects$data[c("studyName")]
+  if (!is.null(qbms_globals$state$gigwa_projects)) {
+    gigwa_projects <- qbms_globals$state$gigwa_projects
+  } else {
+    call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/studies?programDbId=", qbms_globals$config$db)
+    
+    gigwa_projects <- brapi_get_call(call_url)$data
+    
+    gigwa_projects <- gigwa_projects[c("studyName")]
+    
+    qbms_globals$state$gigwa_projects <- gigwa_projects
+  }
 
   return(gigwa_projects)
 }
+
 
 #' Set the current active GIGWA project
 #'
@@ -1578,12 +1961,15 @@ gigwa_set_project <- function(project_name) {
   
   call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/studies?programDbId=", qbms_globals$config$db)
   
-  gigwa_projects <- brapi_get_call(call_url)
+  gigwa_projects <- brapi_get_call(call_url)$data
 
-  project_row <- which(gigwa_projects$data$studyName == project_name)
+  project_row <- which(gigwa_projects$studyName == project_name)
   
-  qbms_globals$state$study_db_id <- gigwa_projects$data[project_row, "studyDbId"]
+  qbms_globals$state$study_db_id <- gigwa_projects[project_row, "studyDbId"]
+  
+  qbms_globals$state$gigwa_runs <- NULL
 }
+
 
 #' Get the list of run names in the selected GIGWA project
 #'
@@ -1615,25 +2001,32 @@ gigwa_list_runs <- function() {
   if (is.null(qbms_globals$state$study_db_id)) {
     stop("No project has been selected yet! You have to set your project first using the `gigwa_set_project()` function")
   }
-  
-  call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/search/variantsets")
-  
-  auth_code <- paste0("Bearer ", qbms_globals$state$token)
-  headers   <- c("Authorization" = auth_code, "Accept-Encoding" = "gzip, deflate")
-  call_body <- paste0('{"studyDbIds": ["', qbms_globals$state$study_db_id, '"]}')
-  
-  response <- httr::POST(url = utils::URLencode(call_url), body = call_body, 
-                         encode = "raw", httr::accept_json(), httr::content_type_json(), 
-                         httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
-  
-  results <- jsonlite::fromJSON(httr::content(response, as = "text"), flatten = TRUE)
-  
-  gigwa_runs <- as.data.frame(results$result$data$variantSetName)
-  
-  colnames(gigwa_runs) <- c("variantSetName")
 
+  if (!is.null(qbms_globals$state$gigwa_runs)) {
+    gigwa_runs <- qbms_globals$state$gigwa_runs
+  } else {
+    call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/search/variantsets")
+    
+    auth_code <- paste0("Bearer ", qbms_globals$state$token)
+    headers   <- c("Authorization" = auth_code, "Accept-Encoding" = "gzip, deflate")
+    call_body <- paste0('{"studyDbIds": ["', qbms_globals$state$study_db_id, '"]}')
+    
+    response <- httr::POST(url = utils::URLencode(call_url), body = call_body, 
+                           encode = "raw", httr::accept_json(), httr::content_type_json(), 
+                           httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
+    
+    results <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = TRUE)
+    
+    gigwa_runs <- as.data.frame(results$result$data$variantSetName)
+    
+    colnames(gigwa_runs) <- c("variantSetName")
+    
+    qbms_globals$state$gigwa_runs <- gigwa_runs
+  }
+  
   return(gigwa_runs)
 }
+
 
 #' Set the current active GIGWA run
 #'
@@ -1665,7 +2058,7 @@ gigwa_list_runs <- function() {
 gigwa_set_run <- function(run_name) {
   valid_runs <- gigwa_list_runs()
   
-  if (!run_name %in% valid_runs) {
+  if (!run_name %in% unlist(valid_runs)) {
     stop("Your run name is not exists in this project! You may use the `gigwa_list_runs()` function to check the available runs")
   }
   
@@ -1679,12 +2072,15 @@ gigwa_set_run <- function(run_name) {
                          encode = "raw", httr::accept_json(), httr::content_type_json(), 
                          httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
   
-  results <- jsonlite::fromJSON(httr::content(response, as = "text"), flatten = TRUE)
+  results <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = TRUE)
   
   gigwa_runs <- as.data.frame(results$result$data)
   
   qbms_globals$state$variant_set_db_id <- gigwa_runs[gigwa_runs$variantSetName == run_name, "variantSetDbId"]
+  
+  qbms_globals$state$gigwa_samples <- NULL
 }
+
 
 #' Get the samples list of the current active GIGWA run
 #'
@@ -1720,20 +2116,29 @@ gigwa_get_samples <- function() {
     stop("No project has been selected yet! You have to set your project first using the `gigwa_set_project()` function")
   }
   
-  call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/search/germplasm")
+  if (!is.null(qbms_globals$state$gigwa_samples)) {
+    gigwa_samples <- qbms_globals$state$gigwa_samples
+  } else {
+    call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/search/germplasm")
+    
+    auth_code <- paste0("Bearer ", qbms_globals$state$token)
+    headers   <- c("Authorization" = auth_code, "Accept-Encoding" = "gzip, deflate")
+    call_body <- paste0('{"studyDbIds": ["', qbms_globals$state$study_db_id, '"]}')
+    
+    response <- httr::POST(url = utils::URLencode(call_url), body = call_body, 
+                           encode = "raw", httr::accept_json(), httr::content_type_json(), 
+                           httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
+    
+    results <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = TRUE)
+    
+    gigwa_samples <- results$result$data$germplasmName
+    
+    qbms_globals$state$gigwa_samples <- gigwa_samples
+  }
 
-  auth_code <- paste0("Bearer ", qbms_globals$state$token)
-  headers   <- c("Authorization" = auth_code, "Accept-Encoding" = "gzip, deflate")
-  call_body <- paste0('{"studyDbIds": ["', qbms_globals$state$study_db_id, '"]}')
-  
-  response <- httr::POST(url = utils::URLencode(call_url), body = call_body, 
-                         encode = "raw", httr::accept_json(), httr::content_type_json(), 
-                         httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
-  
-  results <- jsonlite::fromJSON(httr::content(response, as = "text"), flatten = TRUE)
-  
-  return(results$result$data$germplasmName)
+  return(gigwa_samples)
 }
+
 
 #' Get variants in the selected GIGWA run
 #'
@@ -1815,9 +2220,13 @@ gigwa_get_variants <- function(max_missing = 1, min_maf = 0, samples = NULL) {
   response <- httr::POST(url = utils::URLencode(call_url), body = call_body, encode = "json", 
                          httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
   
-  results <- jsonlite::fromJSON(httr::content(response, as = "text"), flatten = TRUE)
+  results <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = TRUE)
   
   total_variants <- results$count
+
+  if (total_variants == 0) {
+    stop("No variants match your filtering criteria!")
+  }
   
   # setup the progress bar
   pb <- utils::txtProgressBar(min = 0, max = total_variants, initial = 0, style = 3) 
@@ -1831,11 +2240,12 @@ gigwa_get_variants <- function(max_missing = 1, min_maf = 0, samples = NULL) {
                     maxmaf = 50,
                     missingData = max_missing * 100,
                     getGT = TRUE,
+                    pageSize = qbms_globals$config$page_size,
                     pageToken = "0")
 
   g_matrix <- data.frame(matrix(ncol = length(samples) + 4, nrow = 0))
-  
-  repeat{
+
+  repeat {
     repeat {
       # avoid MongoDB error because of a background operation is still running!
       # get the progress status of a process from its token. If no current process is associated with this token, returns null.
@@ -1851,7 +2261,7 @@ gigwa_get_variants <- function(max_missing = 1, min_maf = 0, samples = NULL) {
     response <- httr::POST(url = utils::URLencode(call_url), body = call_body, encode = "json", 
                            httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
 
-    results <- jsonlite::fromJSON(httr::content(response, as = "text"), flatten = TRUE)
+    results <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = TRUE)
     
     n <- nrow(results$variants)
 
@@ -1874,11 +2284,11 @@ gigwa_get_variants <- function(max_missing = 1, min_maf = 0, samples = NULL) {
     call_body$pageToken <- results$nextPageToken
     call_body$searchMode <- 2
   }
-  
+
   utils::setTxtProgressBar(pb, total_variants)
   close(pb)
   
-  g_matrix[,-c(1:4)] <- as.data.frame(sapply(g_matrix[,-c(1:4)], as.numeric))
+  suppressWarnings(g_matrix[,-c(1:4)] <- as.data.frame(sapply(g_matrix[,-c(1:4)], as.numeric)))
   
   g_matrix[, 1] <- gsub(paste0(qbms_globals$state$study_db_id, "\u00A7"), "", g_matrix[, 1])
   
@@ -1886,4 +2296,417 @@ gigwa_get_variants <- function(max_missing = 1, min_maf = 0, samples = NULL) {
                           gsub(paste0(qbms_globals$state$study_db_id, "\u00A7"), "", results$variants[1, "calls"][[1]]$callSetId))
 
   return(g_matrix)
+}
+
+
+#' Get the metadate of the current active GIGWA run
+#'
+#' @description
+#' This function will retrieve the metadata of the current active run
+#' as configured in the internal state object using `gigwa_set_run()` function.
+#'
+#' @return a data.frame of all metadata associated to the samples in the selected run
+#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @seealso \code{\link{set_qbms_config}}, \code{\link{gigwa_set_run}}
+#' @examples
+#' if(interactive()) {
+#' # config your GIGWA connection
+#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
+#'
+#' # select a database by name
+#' gigwa_set_db("3kG_10M")
+#'
+#' # select a project by name
+#' gigwa_set_project("3003_ind")
+#' 
+#' # select a specific run by name
+#' gigwa_set_run("1")
+#' 
+#' # get a list of all samples in the selected run
+#' metadata <- gigwa_get_metadata()
+#' }
+#' @export
+
+gigwa_get_metadata <- function() {
+  if (is.null(qbms_globals$state$study_db_id)) {
+    stop("No project has been selected yet! You have to set your project first using the `gigwa_set_project()` function")
+  }
+  
+  call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/search/germplasm")
+  
+  auth_code <- paste0("Bearer ", qbms_globals$state$token)
+  headers   <- c("Authorization" = auth_code, "Accept-Encoding" = "gzip, deflate")
+  call_body <- paste0('{"studyDbIds": ["', qbms_globals$state$study_db_id, '"]}')
+  
+  response <- httr::POST(url = utils::URLencode(call_url), body = call_body, 
+                         encode = "raw", httr::accept_json(), httr::content_type_json(), 
+                         httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
+  
+  results <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = TRUE)
+  
+  call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/search/attributevalues")
+  
+  germplasmDbIds <- paste(results$result$data$germplasmDbId, collapse = '","')
+  call_body <- paste0('{"germplasmDbIds": ["', germplasmDbIds, '"]}')
+  
+  response <- httr::POST(url = utils::URLencode(call_url), body = call_body, 
+                         encode = "raw", httr::accept_json(), httr::content_type_json(), 
+                         httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
+  
+  results <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = TRUE)
+  
+  metadata <- stats::reshape(results$result$data[,-1], idvar = "germplasmName", timevar = "attributeValueDbId", direction = "wide")
+  colnames(metadata) <- gsub("value\\.", "", colnames(metadata))
+  
+  return(metadata)
+}
+
+
+## TerraClimate ###########################################################################
+
+#' Get TerraClimate data for a given coordinate(s)
+#'
+#' @description
+#' \href{https://www.climatologylab.org/terraclimate.html}{TerraClimate} is a monthly climate dataset 
+#' for global terrestrial surfaces from 1958-2021. This function enables you to extract 
+#' \href{https://www.climatologylab.org/terraclimate-variables.html}{climate variables} from the 
+#' \href{http://thredds.northwestknowledge.net:8080/thredds/terraclimate_aggregated.html}{hosting server} 
+#' provided by the \href{https://hpc.uidaho.edu/}{Idaho University} for a given coordinate(s) without 
+#' a need to download the whole raster files in the netCDF format (~100MB per variable for each year) 
+#' and provide them in a standard data frame format ready to use in your code. It also calculates the 
+#' \href{https://www.worldclim.org/data/bioclim.html}{bioclimatic variables} using the \code{\link{calc_biovars}} 
+#' function derivative from the \href{https://github.com/rspatial/dismo/blob/master/R/biovars.R}{dismo R package}.
+#'
+#' TerraClimate vs. \href{https://www.worldclim.org/data/worldclim21.html}{WorldClim}
+#' \itemize{
+#' \item 1958-2021 vs. 1970-2000
+#' \item 14 vs. 7 climate variables
+#' \item ~4 km vs. ~1 km spatial resolution
+#' \item need to calculate vs. pre-calculated 19 bioclimatic variables
+#' }
+#'
+#' @references Abatzoglou, J., Dobrowski, S., Parks, S. \emph{et al.} TerraClimate, a high-resolution 
+#'             global dataset of monthly climate and climatic water balance from 1958-2015. 
+#'             \emph{Sci Data} \strong{5}, 170191 (2018). 
+#'             \doi{10.1038/sdata.2017.191}
+#' 
+#' @param lat  Vector of Latitude(s) in decimal degree format.
+#' @param lon  Vector of Longitude(s) in decimal degree format.
+#' @param from Start date as a string in the 'YYYY-MM-DD' format.
+#' @param to   End date as a string in the 'YYYY-MM-DD' format.
+#' @param clim_vars List of all climate variables to be imported. Valid list includes: \emph{aet, def, pet,
+#'                  ppt, q, soil, srad, swe, tmax, tmin, vap, ws, vpd, and PDSI}. Default is NULL for all.
+#' @param month_mask A list of all months of interest (e.g., planting season: \code{c(10:12,1:5)}). 
+#'                   Default is NULL for all.
+#' @return A list of two data.frame(s) for each pair of coordinates:
+#' \itemize{
+#' \item \strong{climate:} includes the climate variables (\href{https://www.climatologylab.org/terraclimate-variables.html}{reference}).
+#' \item \strong{biovars:} includes the calculated bioclimatic variables (\href{https://www.worldclim.org/data/bioclim.html}{reference}).
+#' }
+#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @examples
+#' if(interactive()) {
+#' # data <- get_terraclimate(36.016, 36.943, 
+#' #                          '1979-09-01', '2012-06-30', 
+#' #                          c('ppt', 'tmin', 'tmax'), c(10:12,1:5))
+#' data <- get_terraclimate(36.016, 36.943, '1979-09-01', '2012-06-30')
+#' 
+#' View(data$climate[[1]])
+#' 
+#' View(data$biovars[[1]])
+#' }
+#' @export
+
+get_terraclimate <- function(lat, lon, from = '1958-01-01', to = '2020-12-31', clim_vars = NULL, month_mask = NULL){
+  # check if the given lat coordinate values are valid
+  lat <- as.numeric(lat)
+  if (!all(lat >= -90 & lat <= 90)) {
+    stop("The Latitude should be in decimal degree format and range from -90 to +90")
+  }
+  
+  # check if the given lon coordinate values are valid
+  lon <- as.numeric(lon)
+  if (!all(lon >= -180 & lon <= 180)) {
+    stop("The Longitude should be in decimal degree format and range from -180 to +180")
+  }
+  
+  if (length(lat) == length(lon)) {
+    loc_num <- length(lat)
+  } else {
+    stop("The number of Latitude/Longitude values should be the same!")
+  }
+
+  # check if the given from and to date values are valid
+  start_date <- as.Date(from)
+  final_date <- as.Date(to)   
+  
+  if (is.null(clim_vars)) {
+    clim_vars <- c('aet', 'def', 'pet', 'ppt', 'q', 'soil', 'srad', 'swe', 'tmax', 'tmin', 'vap', 'ws', 'vpd', 'PDSI')
+  } else {
+    # check if the given list of vars are supported/existed in TerraClimate vars
+  }
+  
+  if (is.null(month_mask)) {
+    if (is.null(month_mask)) month_mask <- 1:12
+  } else {
+    # check if the given month_mask values are valid
+  }
+  
+  #clim_data <- NULL
+  clim_data <- list()
+  
+  start_month <- as.numeric(format(start_date, '%m'))
+  start_year  <- as.numeric(format(start_date, '%Y'))
+  start_row   <- (start_year - 1958) * 12 + start_month
+  
+  final_month <- as.numeric(format(final_date, '%m'))
+  final_year  <- as.numeric(format(final_date, '%Y'))
+  final_row   <- (final_year - 1958) * 12 + final_month
+  
+  # setup the progress bar
+  pb <- utils::txtProgressBar(min = 0, max = loc_num * length(clim_vars), initial = 0, style = 3) 
+  pb_step <- round(loc_num * length(clim_vars) / 100)
+  
+  for (var in clim_vars) {
+    aggregate_url <- paste0('http://thredds.northwestknowledge.net:8080/thredds/dodsC/agg_terraclimate_', var, '_1958_CurrentYear_GLOBE.nc')
+    nc_metadata   <- RNetCDF::open.nc(aggregate_url)
+    
+    lat_available <- RNetCDF::var.get.nc(nc_metadata, 'lat')
+    lon_available <- RNetCDF::var.get.nc(nc_metadata, 'lon')
+    
+    obs_available <- length(RNetCDF::var.get.nc(nc_metadata, 'time'))
+    
+    for (i in 1:loc_num) {
+      if (length(clim_data) < i) clim_data[[i]] <- data.frame(matrix(nrow = obs_available, ncol = 0))
+
+      # lat_selected  <- match(abs(lat_available - lat[i]) < 1/48, 1)
+      # lon_selected  <- match(abs(lon_available - lon[i]) < 1/48, 1)
+      # 
+      # lat_index <- which(lat_selected %in% 1)
+      # lon_index <- which(lon_selected %in% 1)
+      
+      lat_index <- which.min(abs(lat_available - lat[i]))
+      lon_index <- which.min(abs(lon_available - lon[i]))
+      
+      start <- c(lon_index, lat_index, 1)
+      count <- c(1, 1, NA)
+      
+      # read in the full period of record using aggregated files
+      values <- as.numeric(RNetCDF::var.get.nc(nc_metadata, variable = var, start = start, count = count, unpack = TRUE))
+      
+      clim_data[[i]] <- cbind(clim_data[[i]], values)
+      
+      # update the progress bar
+      utils::setTxtProgressBar(pb, loc_num * which(clim_vars == var) - (loc_num - i))
+    }
+  }
+  
+  close(pb)
+  
+  biovars <- list()
+  
+  for (i in 1:loc_num) {
+    colnames(clim_data[[i]]) <- clim_vars
+    
+    years <- obs_available / 12
+    last  <- 1958 + years - 1
+    month <- rep(1:12, times = years)
+    year  <- rep(1958:last, each = 12)
+    
+    clim_data[[i]] <- cbind(year, month, clim_data[[i]])
+    
+    if (all(c('ppt', 'tmin', 'tmax') %in% clim_vars)) {
+      biovars[[i]] <- calc_biovars(clim_data[[i]][(start_row - (start_month - 1)):(final_row + (12 - final_month)), ])
+    } else {
+      biovars[[i]] <- NULL
+    }
+    
+    clim_data[[i]] <- clim_data[[i]][start_row:final_row, ]
+    clim_data[[i]] <- clim_data[[i]][clim_data[[i]]$month %in% month_mask, ]
+  }
+  
+  return(list(climate = clim_data, biovars = biovars))
+}
+
+
+#' Calculate the Bioclimatic Variables
+#' 
+#' @description
+#' Bioclimatic variables are derived from the monthly temperature and rainfall 
+#' values in order to generate more biologically meaningful variables. These are 
+#' often used in species distribution modeling and related ecological modeling 
+#' techniques. The bioclimatic variables represent annual trends (e.g., mean 
+#' annual temperature, annual precipitation) seasonality (e.g., annual range in 
+#' temperature and precipitation) and extreme or limiting environmental factors 
+#' (e.g., temperature of the coldest and warmest month, and precipitation of the 
+#' wet and dry quarters). A quarter is a period of three months (1/4 of the year).
+#' 
+#' They are coded as follows:
+#' \itemize{
+#' \item BIO1 = Annual Mean Temperature
+#' \item BIO2 = Mean Diurnal Range (Mean of monthly (max temp - min temp))
+#' \item BIO3 = Isothermality (BIO2/BIO7) (* 100)
+#' \item BIO4 = Temperature Seasonality (standard deviation *100)
+#' \item BIO5 = Max Temperature of Warmest Month
+#' \item BIO6 = Min Temperature of Coldest Month
+#' \item BIO7 = Temperature Annual Range (BIO5-BIO6)
+#' \item BIO8 = Mean Temperature of Wettest Quarter
+#' \item BIO9 = Mean Temperature of Driest Quarter
+#' \item BIO10 = Mean Temperature of Warmest Quarter
+#' \item BIO11 = Mean Temperature of Coldest Quarter
+#' \item BIO12 = Annual Precipitation
+#' \item BIO13 = Precipitation of Wettest Month
+#' \item BIO14 = Precipitation of Driest Month
+#' \item BIO15 = Precipitation Seasonality (Coefficient of Variation)
+#' \item BIO16 = Precipitation of Wettest Quarter
+#' \item BIO17 = Precipitation of Driest Quarter
+#' \item BIO18 = Precipitation of Warmest Quarter
+#' \item BIO19 = Precipitation of Coldest Quarter
+#' }
+#'      
+#' This work is derivative from the \href{https://github.com/rspatial/dismo/blob/master/R/biovars.R}{dismo R package}
+#' 
+#' @references Nix, 1986. A biogeographic analysis of Australian elapid snakes. 
+#'             In: R. Longmore (ed.). Atlas of elapid snakes of Australia. 
+#'             Australian Flora and Fauna Series 7. Australian Government Publishing 
+#'             Service, Canberra.
+#'
+#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @author Robert Hijmans, Museum of Vertebrate Zoology, UC Berkeley
+#' 
+#' @param data Data.frame has 4 mandatory columns (year, ppt, tmin, and tmax), 
+#'             and 12 rows (months) for each year sorted from Jan to Dec.
+#' @return Data.frame has 19 columns for "bioclim" variables (bio1-bio19) and 
+#'         last column for year (you will get one row per year).
+#' 
+#' @export
+
+calc_biovars <- function(data) {
+  year <- unique(data$year)
+  
+  if (length(which(table(data$year) != 12)) != 0) { 
+    stop(paste('You have to have 12 rows (months) for each year in your dataset.',  
+               'That is not the case for:', paste(attributes(which(table(data$year) != 12))$names, collapse = ', ')))
+  }
+  
+  required_vars <- c('ppt', 'tmin', 'tmax')
+  var_not_found <- required_vars[!(required_vars %in% colnames(data))]
+  
+  if(length(var_not_found) != 0) {
+    stop(paste('Missing required column(s) in your dataset:', paste(var_not_found, collapse = ', ')))
+  }
+  
+  prec <- matrix(data$ppt,  ncol = 12, byrow = TRUE)
+  tmin <- matrix(data$tmin, ncol = 12, byrow = TRUE)
+  tmax <- matrix(data$tmax, ncol = 12, byrow = TRUE)
+  
+  # can't have missing values in a row
+  nas <- apply(prec, 1, function(x){ any(is.na(x)) } )
+  nas <- nas | apply(tmin, 1, function(x){ any(is.na(x)) } )
+  nas <- nas | apply(tmax, 1, function(x){ any(is.na(x)) } )
+  
+  p <- matrix(nrow = nrow(prec), ncol = 20)
+  colnames(p) = c(paste0('bio', 1:19), 'year')
+  
+  if (all(nas)) { return(p) }
+  
+  prec[nas,] <- NA
+  tmin[nas,] <- NA
+  tmax[nas,] <- NA
+  
+  window <- function(x) { 
+    lng <- length(x)
+    x <- c(x,  x[1:3])
+    m <- matrix(ncol = 3, nrow = lng)
+    for (i in 1:3) { m[,i] <- x[i:(lng+i-1)] }
+    apply(m, MARGIN = 1, FUN = sum)
+  }
+  
+  cv <- function(x) {
+    return(stats::sd(x) / mean(x) * 100)
+  }
+  
+  tavg <- (tmin + tmax) / 2
+  
+  # P1. Annual Mean Temperature 
+  p[, 1] <- apply(tavg, 1, mean)
+  
+  # P2. Mean Diurnal Range(Mean(period max-min)) 
+  p[, 2] <- apply(tmax - tmin, 1, mean)
+  
+  # P4. Temperature Seasonality (standard deviation) 
+  p[,4] <- 100 * apply(tavg, 1, stats::sd)
+  
+  # P5. Max Temperature of Warmest Period 
+  p[, 5] <- apply(tmax, 1, max)
+  
+  # P6. Min Temperature of Coldest Period 
+  p[, 6] <- apply(tmin, 1, min)
+  
+  # P7. Temperature Annual Range (P5-P6) 
+  p[, 7] <- p[, 5] - p[, 6]
+  
+  # P3. Isothermality (P2 / P7) 
+  p[, 3] <- 100 * p[, 2] / p[, 7]
+  
+  # P12. Annual Precipitation 
+  p[, 12] <- apply(prec, 1, sum)
+  
+  # P13. Precipitation of Wettest Period 
+  p[, 13] <-  apply(prec, 1, max)
+  
+  # P14. Precipitation of Driest Period 
+  p[, 14] <-  apply(prec, 1, min)
+  
+  # P15. Precipitation Seasonality(Coefficient of Variation) 
+  # the "1 +" is to avoid strange CVs for areas where mean rainfall is < 1)
+  p[, 15] <- apply(prec+1, 1, cv)
+  
+  # precipitation by quarter (3 months)		
+  wet <- t(apply(prec, 1, window))
+  
+  # P16. Precipitation of Wettest Quarter 
+  p[, 16] <- apply(wet, 1, max)
+  
+  # P17. Precipitation of Driest Quarter 
+  p[, 17] <- apply(wet, 1, min)
+  
+  tmp <- t(apply(tavg, 1, window)) / 3
+  
+  if (all(is.na(wet))) {
+    p[, 8] <- NA		
+    p[, 9] <- NA		
+  } else {
+    # P8. Mean Temperature of Wettest Quarter 
+    wetqrt <- cbind(1:nrow(p), as.integer(apply(wet, 1, which.max)))
+    p[, 8] <- tmp[wetqrt]
+    
+    # P9. Mean Temperature of Driest Quarter 
+    dryqrt <- cbind(1:nrow(p), as.integer(apply(wet, 1, which.min)))
+    p[, 9] <- tmp[dryqrt]
+  }
+  
+  # P10. Mean Temperature of Warmest Quarter 
+  p[, 10] <- apply(tmp, 1, max)
+  
+  # P11. Mean Temperature of Coldest Quarter
+  p[, 11] <- apply(tmp, 1, min) 
+  
+  if (all(is.na(tmp))) {
+    p[, 18] <- NA		
+    p[, 19] <- NA
+  } else {
+    # P18. Precipitation of Warmest Quarter 
+    hot <- cbind(1:nrow(p), as.integer(apply(tmp, 1, which.max)))
+    p[, 18] <- wet[hot]
+    
+    # P19. Precipitation of Coldest Quarter 
+    cold <- cbind(1:nrow(p), as.integer(apply(tmp, 1, which.min)))
+    p[, 19] <- wet[cold]
+  }
+  
+  p[, 20] <- year
+  
+  return(as.data.frame(p))
 }

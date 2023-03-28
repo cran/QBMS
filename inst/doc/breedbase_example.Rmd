@@ -10,7 +10,7 @@ vignette: >
 ---
 
 ## QBMS
-Linking data management systems to analytics is an important step in breeding digitalization. Breeders can use this R package to Query the [Breeding Management System](https://bmspro.io/) database (using [BrAPI](https://brapi.org/) calls) and help them to retrieve their experiments data directly into R statistical analyzing environment.
+Linking data management systems to analytics is an important step in breeding digitalization. Breeders can use this R package to Query the Breeding Management System(s) like [BMS](https://bmspro.io/), [BreedBase](https://breedbase.org), and [GIGWA](https://southgreen.fr/content/gigwa) (using [BrAPI](https://brapi.org/) calls) and help them to retrieve phenotypic and genotypic data directly into their analyzing pipelines developed in R statistical environment.
 
 Well, because **Breedbase** supports the **BrAPI** standard, most of the QBMS functionalities work smoothly with minor changes. For example, you need to give special attention to the `set_qbms_config` parameters (check the example below). Currently, some functions are not supported when working with BreedBase, like `get_program_studies`, `get_germplasm_data`, and `list_trials` filtered by year!
 
@@ -37,7 +37,7 @@ library(QBMS)
 set_qbms_config("https://cassavabase.org/brapi/v1/calls/", 
                 time_out = 300, no_auth = TRUE, engine = "breedbase")
 
-# list supported crops in the current bms server
+# list supported crops in the current BreedBase server
 list_crops()
 
 # select a crop by name
@@ -77,15 +77,4 @@ germplasm <- get_germplasm_list()
 # retrieve multi-environment trial data of the selected study/trial
 MET <- get_trial_data()
 
-```
-## _Troubleshooting the installation_
-
-1. If the installation of QBMS generates errors saying that some of the existing packages cannot be removed, you can try to quit any R session, and try to start R in administrator (Windows) or SUDO mode (Linux/Ubuntu) then try installing again.
-
-2. If you get an error related to packages built under a current version of R, and updating your packages doesn’t help, you can consider overriding the error with the following code. _Note: This might help you install QBMS but may result in other problems. If possible, it’s best to resolve the errors rather than ignoring them._
-
-```r
-Sys.setenv("R_REMOTES_NO_ERRORS_FROM_WARNINGS" = TRUE)
-
-remotes::install_github("icarda-git/QBMS", upgrade = "always")
 ```

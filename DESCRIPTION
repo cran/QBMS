@@ -1,8 +1,8 @@
 Type: Package
 Package: QBMS
 Title: Query the Breeding Management System(s)
-Version: 0.9.0
-Date: 2023-03-20
+Version: 0.9.1
+Date: 2023-03-28
 Authors@R: c(
     person("Khaled", "Al-Shamaa", , "k.el-shamaa@cgiar.org", role = c("aut", "cre")),
     person("Mariano Omar", "Crimi", , "m.crimi@cgiar.org", role = "ctb"),
@@ -32,6 +32,6 @@ VignetteBuilder: knitr
 Encoding: UTF-8
 NeedsCompilation: no
 RoxygenNote: 7.2.3
-Packaged: 2023-03-27 22:44:25 UTC; Kel-shamaa
+Packaged: 2023-03-28 10:27:24 UTC; Kel-shamaa
 Repository: CRAN
-Date/Publication: 2023-03-28 01:10:11 UTC
+Date/Publication: 2023-03-28 12:40:05 UTC

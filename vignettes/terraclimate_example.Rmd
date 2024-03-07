@@ -10,17 +10,21 @@ vignette: >
 ---
 
 ## QBMS
-Linking data management systems to analytics is an important step in breeding digitalization. Breeders can use this R package to Query the Breeding Management System(s) like [BMS](https://bmspro.io/), [BreedBase](https://breedbase.org), and [GIGWA](https://southgreen.fr/content/gigwa) (using [BrAPI](https://brapi.org/) calls) and help them to retrieve phenotypic and genotypic data directly into their analyzing pipelines developed in R statistical environment.
+This R package assists breeders in linking data systems with their analytic pipelines, a crucial step in digitizing breeding processes. It supports querying and retrieving phenotypic and genotypic data from systems like [EBS](https://ebs.excellenceinbreeding.org/), [BMS](https://bmspro.io/), [BreedBase](https://breedbase.org), and [GIGWA](https://github.com/SouthGreenPlatform/Gigwa2) (using [BrAPI](https://brapi.org/) calls). Extra helper functions support environmental data sources, including [TerraClimate](https://www.climatologylab.org/terraclimate.html) and FAO [HWSDv2](https://gaez.fao.org/pages/hwsd) soil database.
 
 ## TerraClimate
 [TerraClimate](https://www.climatologylab.org/terraclimate.html) is a dataset of monthly climate and climatic water balance for global terrestrial surfaces from 1958-2019. These data provide important inputs for ecological and hydrological studies at global scales that require high spatial resolution and time-varying data. All data have monthly temporal resolution and a ~4-km (1/24th degree) spatial resolution. The data cover the period from 1958-2020. We plan to update these data periodically (annually).
 
-###Reference:
+[TerraClimate](https://www.climatologylab.org/terraclimate.html) is a climate and climatic water balance dataset of [14 variables](https://www.climatologylab.org/terraclimate-variables.html) for global terrestrial surfaces from 1958 to 2022 (updated annually) comparing to 7 climate variables for 1970-2000 in [WorldClim dataset](https://www.worldclim.org/data/worldclim21.html). All data have monthly temporal resolution and a ~4-km (1/24th degree) spatial resolution.
+
+You can retrieve TerraClimate data using the QBMS R package in two modes, Online using API calls (minimizing download size), or Offline by downloading required NetCDF rasters first (minimizing query time). QBMS also calculate the 19 derivatives [bioclimatic variables](https://www.worldclim.org/data/bioclim.html) on-fly.
+
+### Reference:
 Abatzoglou, J., Dobrowski, S., Parks, S. et al. TerraClimate, a high-resolution global dataset of monthly climate and climatic water balance from 1958–2015. Sci Data 5, 170191 (2018). [https://doi.org/10.1038/sdata.2017.191](https://doi.org/10.1038/sdata.2017.191)
 
 ## _Install_
 ```r
-install.packages("remotes")
+if (!require("remotes")) install.packages("remotes")
 remotes::install_github("icarda-git/QBMS")
 ```
 
@@ -61,3 +65,21 @@ worldclim_norm  <- apply(worldclim_range$biovars[[2]][,1:19], 2, function(x) rou
 # worldclim     592.0  140.0  0.0    99.0   368.0  1.0    2.0    368.0
 
 ```
+
+## _Offline Mode (Download TerraClimate netCDF data files)_
+```r
+# ?ini_terraclimate
+ini_terraclimate('2018-09-01', '2019-06-30', c('ppt', 'tmin', 'tmax'))
+
+# Get TerraClimate data for a given coordinate(s)
+data <- get_terraclimate(y, x, '2018-09-01', '2019-06-30', c('ppt', 'tmin', 'tmax'), offline = TRUE)
+
+```
+
+_If you encounter a timeout error during the execution of the `ini-terraclimate()` function, you can extend the timeout duration of your environment with the following command (e.g., to 5 minutes, which is 300 seconds, instead of the default 60 seconds):_
+
+```r
+options(timeout = max(300, getOption("timeout")))
+```
+
+_The default timeout of 60 seconds is often not sufficient for downloading large files (over 50 MB). Additionally, expecting download times of less than 1MB per second is unrealistic._

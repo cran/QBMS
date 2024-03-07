@@ -2,15 +2,17 @@
 % Please edit documentation in R/qbms.R
 \name{get_terraclimate}
 \alias{get_terraclimate}
-\title{Get TerraClimate data for a given coordinate(s)}
+\title{Get TerraClimate Data for a Given Coordinate(s)}
 \usage{
 get_terraclimate(
   lat,
   lon,
   from = "1958-01-01",
-  to = "2020-12-31",
+  to = "2022-12-31",
   clim_vars = NULL,
-  month_mask = NULL
+  month_mask = NULL,
+  offline = FALSE,
+  data_path = "./data/"
 )
 }
 \arguments{
@@ -27,6 +29,10 @@ ppt, q, soil, srad, swe, tmax, tmin, vap, ws, vpd, and PDSI}. Default is NULL fo
 
 \item{month_mask}{A list of all months of interest (e.g., planting season: \code{c(10:12,1:5)}). 
 Default is NULL for all.}
+
+\item{offline}{Extract TerraClimate data from downloaded netCDF files (default is FALSE)}
+
+\item{data_path}{String contains the directory path where downloaded netCDF files exists (default is './data/')}
 }
 \value{
 A list of two data.frame(s) for each pair of coordinates:
@@ -55,15 +61,15 @@ TerraClimate vs. \href{https://www.worldclim.org/data/worldclim21.html}{WorldCli
 }
 }
 \examples{
-if(interactive()) {
-# data <- get_terraclimate(36.016, 36.943, 
-#                          '1979-09-01', '2012-06-30', 
-#                          c('ppt', 'tmin', 'tmax'), c(10:12,1:5))
-data <- get_terraclimate(36.016, 36.943, '1979-09-01', '2012-06-30')
+if (interactive()) {
+  # data <- get_terraclimate(36.016, 36.943, 
+  #                          '1979-09-01', '2012-06-30', 
+  #                          c('ppt', 'tmin', 'tmax'), c(10:12,1:5))
+  data <- get_terraclimate(36.016, 36.943, '1979-09-01', '2012-06-30')
 
-View(data$climate[[1]])
+  View(data$climate[[1]])
 
-View(data$biovars[[1]])
+  View(data$biovars[[1]])
 }
 }
 \references{
@@ -71,6 +77,9 @@ Abatzoglou, J., Dobrowski, S., Parks, S. \emph{et al.} TerraClimate, a high-reso
             global dataset of monthly climate and climatic water balance from 1958-2015. 
             \emph{Sci Data} \strong{5}, 170191 (2018). 
             \doi{10.1038/sdata.2017.191}
+}
+\seealso{
+\code{\link{ini_terraclimate}}
 }
 \author{
 Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}

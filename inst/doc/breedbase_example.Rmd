@@ -10,9 +10,7 @@ vignette: >
 ---
 
 ## QBMS
-Linking data management systems to analytics is an important step in breeding digitalization. Breeders can use this R package to Query the Breeding Management System(s) like [BMS](https://bmspro.io/), [BreedBase](https://breedbase.org), and [GIGWA](https://southgreen.fr/content/gigwa) (using [BrAPI](https://brapi.org/) calls) and help them to retrieve phenotypic and genotypic data directly into their analyzing pipelines developed in R statistical environment.
-
-Well, because **Breedbase** supports the **BrAPI** standard, most of the QBMS functionalities work smoothly with minor changes. For example, you need to give special attention to the `set_qbms_config` parameters (check the example below). Currently, some functions are not supported when working with BreedBase, like `get_program_studies`, `get_germplasm_data`, and `list_trials` filtered by year!
+This R package assists breeders in linking data systems with their analytic pipelines, a crucial step in digitizing breeding processes. It supports querying and retrieving phenotypic and genotypic data from systems like [EBS](https://ebs.excellenceinbreeding.org/), [BMS](https://bmspro.io/), [BreedBase](https://breedbase.org), and [GIGWA](https://github.com/SouthGreenPlatform/Gigwa2) (using [BrAPI](https://brapi.org/) calls). Extra helper functions support environmental data sources, including [TerraClimate](https://www.climatologylab.org/terraclimate.html) and FAO [HWSDv2](https://gaez.fao.org/pages/hwsd) soil database.
 
 ## BreedBase
 [Breedbase](https://breedbase.org/) is a comprehensive breeding management and analysis software. It can be used to design field layouts, collect phenotypic information using tablets, support the collection of genotyping samples in a field, store large amounts of high density genotypic information, and provide Genomic Selection related analyses and predictions.
@@ -22,7 +20,7 @@ The Breeding API ([BrAPI](https://brapi.org/)) project is an effort to enable in
 
 ## _Install_
 ```r
-install.packages("remotes")
+if (!require("remotes")) install.packages("remotes")
 remotes::install_github("icarda-git/QBMS")
 ```
 
@@ -34,14 +32,12 @@ remotes::install_github("icarda-git/QBMS")
 library(QBMS)
 
 # Cassava BreedBase server
-set_qbms_config("https://cassavabase.org/brapi/v1/calls/", 
-                time_out = 300, no_auth = TRUE, engine = "breedbase")
+set_qbms_config("https://cassavabase.org/", no_auth = TRUE, engine = "breedbase")
+
+# login_breedbase("username", "password")
 
 # list supported crops in the current BreedBase server
 list_crops()
-
-# select a crop by name
-set_crop("Cassava")
 
 # list all breeding programs in the selected crop
 list_programs()
@@ -49,32 +45,45 @@ list_programs()
 # select a breeding program by name
 set_program("IITA")
 
-# list all studies/trials in the selected program
+# list all folders in the selected program
 list_trials()
 
-# select a specific study/trial by name
+# select a specific folder by name, choose the last/final folder that contains 
+# your experiments in any nested folder structure
 set_trial("20_Abuja")
 
-# get observation variable ontology in the selected study/trial
-get_trial_obs_ontology()
-
-# list all environments/locations information in the selected study/trial
+# list all studies/experiments in the selected folder
 list_studies()
 
-# select a specific environment/location by name
+# select a specific study/experiment by name
 set_study("20NCRP12yrtAB")
 
-# another option, select a specific study by location name (first match)
+# another option, select a specific study/experiment by location name (first match)
 # studies <- list_studies()
 # set_study(studies[studies$locationName == "Abuja", "studyName"][1])
 
 # retrieve general information, data, and germplasm list 
-# of the selected environment/location
+# of the selected study/experiment
 info <- get_study_info()
 data <- get_study_data()
+
+# not effecient call at the BreedBase backend BrAPI endpoint
 germplasm <- get_germplasm_list()
 
-# retrieve multi-environment trial data of the selected study/trial
+# get observation variable ontology in the selected study/experiment
+ontology <- get_trial_obs_ontology()
+
+# replace long trait names with short ones from the ontology 
+fields <- colnames(data) 
+
+for (i in 1:length(fields)) {
+  j <- which(ontology$name %in% fields[i])
+  if (length(j) > 0) fields[i] <- ontology$synonyms[[j]][1]
+}
+
+colnames(data) <- fields
+
+# retrieve all studies/experiments data in the selected folder
 MET <- get_trial_data()
 
 ```

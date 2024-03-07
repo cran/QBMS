@@ -14,7 +14,7 @@
 
 <meta name="date" content="2024-03-07" />
 
-<title>BreedBase Example</title>
+<title>FAO HWSD v2 Example</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -338,7 +338,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<h1 class="title toc-ignore">BreedBase Example</h1>
+<h1 class="title toc-ignore">FAO HWSD v2 Example</h1>
 <h4 class="author">Khaled Al-Shamaa</h4>
 <h4 class="date">2024-03-07</h4>
 
@@ -354,95 +354,67 @@ support environmental data sources, including <a href="https://www.climatologyla
 and FAO <a href="https://gaez.fao.org/pages/hwsd">HWSDv2</a> soil
 database.</p>
 </div>
-<div id="breedbase" class="section level2">
-<h2>BreedBase</h2>
-<p><a href="https://breedbase.org/">Breedbase</a> is a comprehensive
-breeding management and analysis software. It can be used to design
-field layouts, collect phenotypic information using tablets, support the
-collection of genotyping samples in a field, store large amounts of high
-density genotypic information, and provide Genomic Selection related
-analyses and predictions.</p>
-</div>
-<div id="brapi" class="section level2">
-<h2>BrAPI</h2>
-<p>The Breeding API (<a href="https://brapi.org/">BrAPI</a>) project is
-an effort to enable interoperability among plant breeding databases.
-BrAPI is a standardized RESTful web service API specification for
-communicating plant breeding data. This community driven standard is
-free to be used by anyone interested in plant breeding data
-management.</p>
+<div id="fao-hwsd-v2-soil-database" class="section level2">
+<h2>FAO HWSD v2 Soil Database</h2>
+<p>The Harmonized World Soil Database version 2.0 (<a href="https://gaez.fao.org/pages/hwsd">HWSD v2.0</a>) is a unique global
+soil inventory providing information on the morphological, chemical and
+physical properties of soils at approximately 1 km resolution. Its main
+objective is to serve as a basis for prospective studies on
+agro-ecological zoning, food security and climate change.</p>
+<blockquote>
+<p>For more details, you can get the HWSD v2.0 technical report and
+instructions <a href="https://doi.org/10.4060/cc3823en">https://doi.org/10.4060/cc3823en</a>.</p>
+</blockquote>
 </div>
 <div id="install" class="section level2">
 <h2><em>Install</em></h2>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">require</span>(<span class="st">&quot;remotes&quot;</span>)) <span class="fu">install.packages</span>(<span class="st">&quot;remotes&quot;</span>)</span>
 <span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>remotes<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">&quot;icarda-git/QBMS&quot;</span>)</span></code></pre></div>
-<blockquote>
-<p><em>You can find a set of Breedbase based servers available for
-several crops and accessible with no authentication required are listed
-at the BrAPI website on the following page under the group of
-<strong>Boyce Thompson Institute (BTI)</strong>, discovery and
-innovation in the life sciences: <a href="https://brapi.org/servers">https://brapi.org/servers</a>.</em></p>
-</blockquote>
 </div>
 <div id="example" class="section level2">
 <h2><em>Example</em></h2>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># load the QBMS library</span></span>
 <span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">library</span>(QBMS)</span>
 <span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># Cassava BreedBase server</span></span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="fu">set_qbms_config</span>(<span class="st">&quot;https://cassavabase.org/&quot;</span>, <span class="at">no_auth =</span> <span class="cn">TRUE</span>, <span class="at">engine =</span> <span class="st">&quot;breedbase&quot;</span>)</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># login_breedbase(&quot;username&quot;, &quot;password&quot;)</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># create a simple data.frame for a list of locations and their coordinates</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>Location  <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&#39;Tel-Hadya&#39;</span>, <span class="st">&#39;Terbol&#39;</span>, <span class="st">&#39;Marchouch&#39;</span>)</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>Latitude  <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">36.016</span>, <span class="fl">33.808</span>, <span class="fl">33.616</span>)</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>Longitude <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">36.943</span>, <span class="fl">35.991</span>, <span class="sc">-</span><span class="fl">6.716</span>)</span>
 <span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a></span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co"># list supported crops in the current BreedBase server</span></span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="fu">list_crops</span>()</span>
-<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a></span>
-<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="co"># list all breeding programs in the selected crop</span></span>
-<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="fu">list_programs</span>()</span>
-<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a></span>
-<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a><span class="co"># select a breeding program by name</span></span>
-<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="fu">set_program</span>(<span class="st">&quot;IITA&quot;</span>)</span>
-<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a></span>
-<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a><span class="co"># list all folders in the selected program</span></span>
-<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a><span class="fu">list_trials</span>()</span>
-<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a></span>
-<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a><span class="co"># select a specific folder by name, choose the last/final folder that contains </span></span>
-<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a><span class="co"># your experiments in any nested folder structure</span></span>
-<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a><span class="fu">set_trial</span>(<span class="st">&quot;20_Abuja&quot;</span>)</span>
-<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a></span>
-<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a><span class="co"># list all studies/experiments in the selected folder</span></span>
-<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a><span class="fu">list_studies</span>()</span>
-<span id="cb2-27"><a href="#cb2-27" tabindex="-1"></a></span>
-<span id="cb2-28"><a href="#cb2-28" tabindex="-1"></a><span class="co"># select a specific study/experiment by name</span></span>
-<span id="cb2-29"><a href="#cb2-29" tabindex="-1"></a><span class="fu">set_study</span>(<span class="st">&quot;20NCRP12yrtAB&quot;</span>)</span>
-<span id="cb2-30"><a href="#cb2-30" tabindex="-1"></a></span>
-<span id="cb2-31"><a href="#cb2-31" tabindex="-1"></a><span class="co"># another option, select a specific study/experiment by location name (first match)</span></span>
-<span id="cb2-32"><a href="#cb2-32" tabindex="-1"></a><span class="co"># studies &lt;- list_studies()</span></span>
-<span id="cb2-33"><a href="#cb2-33" tabindex="-1"></a><span class="co"># set_study(studies[studies$locationName == &quot;Abuja&quot;, &quot;studyName&quot;][1])</span></span>
-<span id="cb2-34"><a href="#cb2-34" tabindex="-1"></a></span>
-<span id="cb2-35"><a href="#cb2-35" tabindex="-1"></a><span class="co"># retrieve general information, data, and germplasm list </span></span>
-<span id="cb2-36"><a href="#cb2-36" tabindex="-1"></a><span class="co"># of the selected study/experiment</span></span>
-<span id="cb2-37"><a href="#cb2-37" tabindex="-1"></a>info <span class="ot">&lt;-</span> <span class="fu">get_study_info</span>()</span>
-<span id="cb2-38"><a href="#cb2-38" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">get_study_data</span>()</span>
-<span id="cb2-39"><a href="#cb2-39" tabindex="-1"></a></span>
-<span id="cb2-40"><a href="#cb2-40" tabindex="-1"></a><span class="co"># not effecient call at the BreedBase backend BrAPI endpoint</span></span>
-<span id="cb2-41"><a href="#cb2-41" tabindex="-1"></a>germplasm <span class="ot">&lt;-</span> <span class="fu">get_germplasm_list</span>()</span>
-<span id="cb2-42"><a href="#cb2-42" tabindex="-1"></a></span>
-<span id="cb2-43"><a href="#cb2-43" tabindex="-1"></a><span class="co"># get observation variable ontology in the selected study/experiment</span></span>
-<span id="cb2-44"><a href="#cb2-44" tabindex="-1"></a>ontology <span class="ot">&lt;-</span> <span class="fu">get_trial_obs_ontology</span>()</span>
-<span id="cb2-45"><a href="#cb2-45" tabindex="-1"></a></span>
-<span id="cb2-46"><a href="#cb2-46" tabindex="-1"></a><span class="co"># replace long trait names with short ones from the ontology </span></span>
-<span id="cb2-47"><a href="#cb2-47" tabindex="-1"></a>fields <span class="ot">&lt;-</span> <span class="fu">colnames</span>(data) </span>
-<span id="cb2-48"><a href="#cb2-48" tabindex="-1"></a></span>
-<span id="cb2-49"><a href="#cb2-49" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(fields)) {</span>
-<span id="cb2-50"><a href="#cb2-50" tabindex="-1"></a>  j <span class="ot">&lt;-</span> <span class="fu">which</span>(ontology<span class="sc">$</span>name <span class="sc">%in%</span> fields[i])</span>
-<span id="cb2-51"><a href="#cb2-51" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">length</span>(j) <span class="sc">&gt;</span> <span class="dv">0</span>) fields[i] <span class="ot">&lt;-</span> ontology<span class="sc">$</span>synonyms[[j]][<span class="dv">1</span>]</span>
-<span id="cb2-52"><a href="#cb2-52" tabindex="-1"></a>}</span>
-<span id="cb2-53"><a href="#cb2-53" tabindex="-1"></a></span>
-<span id="cb2-54"><a href="#cb2-54" tabindex="-1"></a><span class="fu">colnames</span>(data) <span class="ot">&lt;-</span> fields</span>
-<span id="cb2-55"><a href="#cb2-55" tabindex="-1"></a></span>
-<span id="cb2-56"><a href="#cb2-56" tabindex="-1"></a><span class="co"># retrieve all studies/experiments data in the selected folder</span></span>
-<span id="cb2-57"><a href="#cb2-57" tabindex="-1"></a>MET <span class="ot">&lt;-</span> <span class="fu">get_trial_data</span>()</span></code></pre></div>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>sites <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(Location, Latitude, Longitude)</span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="co"># initiate, download, and setup the HWSD v2 in a given local directory</span></span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a>hwsd2 <span class="ot">&lt;-</span> <span class="fu">ini_hwsd2</span>()</span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a></span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a><span class="co"># query soil attributes for given sites using the HWSD v2 connection object</span></span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a><span class="co">#  </span></span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="co"># sequence parameter, range between 1 and 12 (max), 1 is the dominant soil. </span></span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a><span class="co"># returned df has SHARE column refers to share% </span></span>
+<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a><span class="co"># </span></span>
+<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a><span class="co"># layer parameter refers to depth layer (D1 to D7). </span></span>
+<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a><span class="co"># returned df has TOPDEP/BOTDEP columns represent top/bottom layer depth in cm.</span></span>
+<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a>sites <span class="ot">&lt;-</span> <span class="fu">get_hwsd2</span>(<span class="at">df =</span> sites, </span>
+<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a>                   <span class="at">con =</span> hwsd2, </span>
+<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a>                   <span class="at">x =</span> <span class="st">&#39;Longitude&#39;</span>, </span>
+<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a>                   <span class="at">y =</span> <span class="st">&#39;Latitude&#39;</span>, </span>
+<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a>                   <span class="at">sequence =</span> <span class="dv">1</span>, </span>
+<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a>                   <span class="at">layer =</span> <span class="st">&#39;D1&#39;</span>)</span></code></pre></div>
+</div>
+<div id="advanced-users" class="section level2">
+<h2><em>Advanced Users</em></h2>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># check the HWSD v2 raster </span></span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">print</span>(hwsd2<span class="sc">$</span>raster)</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a> </span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="co"># display the metadata for the layers table</span></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>DBI<span class="sc">::</span><span class="fu">dbGetQuery</span>(hwsd2<span class="sc">$</span>sqlite, <span class="st">&#39;select * from HWSD2_LAYERS_METADATA&#39;</span>)</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a> </span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="co"># the lookup tables are shown for the coded fields</span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="co"># for example, the USDA Texture Class codes (the column TEXTURE_USDA value)</span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co"># are linked to their names in table D_TEXTURE_USDA</span></span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>DBI<span class="sc">::</span><span class="fu">dbGetQuery</span>(hwsd2<span class="sc">$</span>sqlite, <span class="st">&#39;select * from D_TEXTURE_USDA&#39;</span>)</span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a> </span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="co"># disconnect (close) the SQLite connection</span></span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a>DBI<span class="sc">::</span><span class="fu">dbDisconnect</span>(hwsd2<span class="sc">$</span>sqlite)</span></code></pre></div>
 </div>
 
 

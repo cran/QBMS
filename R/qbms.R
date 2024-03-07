@@ -1,17 +1,149 @@
+# /brapi/{brapi_ver}/{brapi_call}
+brapi_map <- data.frame(func_name  = character(), 
+                        brapi_ver  = character(),
+                        brapi_call = character())
+
+# need to be deprecated in favor of list_dbs() and set_db() functions
+# https://github.com/plantbreeding/BrAPI/issues/495
+brapi_map <- rbind(brapi_map, c("list_crops", "v1", "crops"))
+brapi_map <- rbind(brapi_map, c("list_crops", "v2", "commoncropnames"))
+
+brapi_map <- rbind(brapi_map, c("list_programs", "v1", "programs"))
+brapi_map <- rbind(brapi_map, c("list_programs", "v2", "programs"))
+
+brapi_map <- rbind(brapi_map, c("get_program_trials", "v1", "trials?programDbId={programDbId}"))
+brapi_map <- rbind(brapi_map, c("get_program_trials", "v2", "trials?programDbId={programDbId}"))
+
+brapi_map <- rbind(brapi_map, c("list_studies", "v1", "studies?trialDbId={trialDbId}"))
+brapi_map <- rbind(brapi_map, c("list_studies", "v2", "studies?trialDbId={trialDbId}"))
+
+brapi_map <- rbind(brapi_map, c("get_study_info", "v1", "studies/{studyDbId}"))
+brapi_map <- rbind(brapi_map, c("get_study_info", "v2", "studies/{studyDbId}"))
+
+brapi_map <- rbind(brapi_map, c("get_study_data", "v1", "studies/{studyDbId}/table"))
+brapi_map <- rbind(brapi_map, c("get_study_data", "v2", "observations/table?studyDbId={studyDbId}"))
+
+brapi_map <- rbind(brapi_map, c("get_germplasm_list", "v1", "studies/{studyDbId}/germplasm"))
+brapi_map <- rbind(brapi_map, c("get_germplasm_list", "v2", "germplasm?studyDbId={studyDbId}"))
+
+brapi_map <- rbind(brapi_map, c("list_locations", "v1", "locations"))
+brapi_map <- rbind(brapi_map, c("list_locations", "v2", "locations"))
+
+brapi_map <- rbind(brapi_map, c("get_trial_obs_ontology", "v1", "variables"))
+brapi_map <- rbind(brapi_map, c("get_trial_obs_ontology", "v2", "variables"))
+
+brapi_map <- rbind(brapi_map, c("get_germplasm_id", "v1", "germplasm?germplasmName={germplasmName}"))
+brapi_map <- rbind(brapi_map, c("get_germplasm_id", "v2", "germplasm?germplasmName={germplasmName}"))
+
+# POST: germplasmDbIds, observationLevel = "PLOT"
+brapi_map <- rbind(brapi_map, c("get_germplasm_data", "v1", "phenotypes-search"))
+
+brapi_map <- rbind(brapi_map, c("get_germplasm_attributes", "v1", "germplasm/{germplasmDbId}/attributes"))
+brapi_map <- rbind(brapi_map, c("get_germplasm_attributes", "v2", "attributes?germplasmDbId={germplasmDbId}"))
+
+############################### GIGWA calls ####################################
+
+brapi_map <- rbind(brapi_map, c("gigwa_list_dbs", "v2", "programs"))
+brapi_map <- rbind(brapi_map, c("gigwa_list_projects", "v2", "studies?programDbId={programDbId}"))
+
+# POST: studyDbIds
+brapi_map <- rbind(brapi_map, c("gigwa_list_runs", "v2", "search/variantsets"))
+
+# POST: studyDbIds
+brapi_map <- rbind(brapi_map, c("gigwa_get_samples", "v2", "search/germplasm"))
+
+# POST: germplasmDbIds
+brapi_map <- rbind(brapi_map, c("gigwa_get_metadata", "v2", "search/attributevalues"))
+
+################################################################################
+
+colnames(brapi_map) <- c("func_name", "brapi_ver", "brapi_call")
+
+
+#' Scan BrAPI Endpoints
+#'
+#' @description
+#' Scan available BrAPI endpoints on the configured source server.
+#'
+#' @param programDbId (numeric) ProgramDbId used for BrAPI endpoints scanning. Default is 0.
+#' @param trialDbId (numeric) TrialDbId used for BrAPI endpoints scanning. Default is 0.
+#' @param studyDbId (numeric) StudyDbId used for BrAPI endpoints scanning. Default is 0.
+#'
+#' @return
+#' A data frame listing the QBMS function, BrAPI endpoint URL, and status.
+#'
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#'
+#' @export
+
+scan_brapi_endpoints <- function(programDbId = 0, trialDbId = 0, studyDbId = 0) {
+  if (is.null(qbms_globals$config$base_url)) {
+    stop("No server has been defined yet! You have to set your server configurations first using the `set_qbms_config()` function")
+  }
+  
+  call_url <- paste0(qbms_globals$config$base_url, 
+                     ifelse(qbms_globals$config$crop == "", "", paste0("/", qbms_globals$config$crop)), 
+                     "/brapi/", brapi_map$brapi_ver, "/", 
+                     brapi_map$brapi_call)
+  
+  call_url <- sub("\\{programDbId\\}", programDbId, call_url)
+  call_url <- sub("\\{trialDbId\\}", trialDbId, call_url)
+  call_url <- sub("\\{studyDbId\\}", studyDbId, call_url)
+  call_url <- sub("\\{.*\\}", "1", call_url)
+  
+  # ensure getting the minimum data while scanning BrAPI endpoints
+  call_url <- ifelse(grepl("\\?", call_url),
+                     paste0(call_url, "&pageSize=1"),
+                     paste0(call_url, "?pageSize=1"))
+  
+  scan_result <- !sapply(call_url, function (url) httr::http_error(httr::GET(url, httr::add_headers(brapi_headers()))))
+  scan_result <- as.data.frame(cbind(brapi_map$func_name, call_url, scan_result))
+  
+  rownames(scan_result) <- NULL
+  colnames(scan_result) <- c("QBMS Function", "BrAPI endpoint", "Available")
+  
+  return(scan_result)
+}
+
+
+# List of non-BrAPI calls in QBMS functions
+#
+# get_program_studies()
+# /crops/{cropName}/programs/{programUUID}/studies/{studyId}/entries/metadata (BMS: get study entries metadata)
+#
+# get_germplasm_list()
+# /crops/{cropName}/programs/{programUUID}/studies/{studyId}/entries (BMS: get entry type) (POST: body = "")
+#
+# gigwa_get_variants()
+# /ga4gh/variants/search 
+# 
+# dancing steps: 
+# - searchMode = 0 to get total
+# - then searchMode = 3 to request actual results
+# - keep checking progress status /gigwa/progress
+# - then call the same /ga4gh/variants/search to get the ready results
+# 
+# GA4GH: https://rest.ensembl.org/documentation/info/gavariants
+# BrAPI: https://app.swaggerhub.com/apis/PlantBreedingAPI/BrAPI-Genotyping/2.1#/Allele%20Matrix
+
+
 # Internal state variables/lists
 qbms_globals <- new.env()
 qbms_globals$config <- list(crop = NULL)
 qbms_globals$state  <- list(token = NULL)
 
 
-#' Combine data.frames by row, filling in missing columns
+#' Combine Data Frames by Row, Filling in Missing Columns
 #'
 #' @description
-#' rbinds a list of data frames filling missing columns with NA
+#' Combines a list of data frames by row, filling in missing columns with NA.
 #'
-#' @param ... the first argument data frame.
-#' @param dfs input data frames to row bind together.
-#' @return a single data frame
+#' @param ... The first argument data frame.
+#' @param dfs Input data frames to row bind together.
+#' 
+#' @return
+#' A single data frame.
 
 rbindx <- function(..., dfs = list(...)) {
   ns <- unique(unlist(sapply(dfs, names)))
@@ -24,13 +156,15 @@ rbindx <- function(..., dfs = list(...)) {
 }
 
 
-#' Makes one data.table from a list of many
+#' Make One Data.Table from a List of Many
 #'
 #' @description
-#' Same as do.call("rbind", x) on data.frames, but much faster.
+#' Performs the equivalent of do.call("rbind", x) on data.frames, but much faster.
 #'
-#' @param x A list containing data.table, data.frame or list objects.
-#' @return an unkeyed data.table containing a concatenation of all the items passed in.
+#' @param x A list containing data.table, data.frame, or list objects.
+#' 
+#' @return
+#' An unkeyed data.table containing a concatenation of all the items passed in.
 
 rbindlistx <- function(x) {
   u  <- unlist(x, recursive = FALSE)
@@ -42,17 +176,22 @@ rbindlistx <- function(x) {
 }
 
 
-#' Debug internal QBMS status object
+#' Debug Internal QBMS Status Object
 #'
 #' @description
-#' Return the internal QBMS status object for debugging
+#' Returns the internal QBMS status object for debugging purposes.
 #'
-#' @return an environment object for the package config and status
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @return
+#' An environment object containing package configuration and status.
+#'
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#'
 #' @examples
 #' obj <- debug_qbms()
 #' obj$config
 #' obj$state
+#'
 #' @export
 
 debug_qbms <- function() {
@@ -60,50 +199,61 @@ debug_qbms <- function() {
 }
 
 
-#' Get the QBMS connection
+#' Get the QBMS Connection
 #'
 #' @description
-#' Get the QBMS connection object from the current environment
+#' Retrieves the QBMS connection object from the current environment.
 #'
-#' @return a list of the current connection config and status
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @return
+#' A list containing the current connection configuration and status.
+#'
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#'
 #' @seealso \code{\link{set_qbms_connection}}
+#'
 #' @examples
 #' if(interactive()) {
-#' # configure QBMS to connect the phenotypics server
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench/controller/auth/login")
-#' 
-#' # login, set the crop, and program
-#' login_bms()
-#' set_crop("maize")
-#' set_program("MC Maize")
-#' 
-#' # get germplasm data
-#' df1 <- get_germplasm_data("BASFCORN-2-1")
-#' 
-#' # save current connection (phenotypic server)
-#' con1 <- get_qbms_connection()
-#' 
-#' # configure QBMS to connect the genotypic server
-#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", engine = "gigwa", no_auth = TRUE)
-#' 
-#' # set the db, project, and run
-#' gigwa_set_db("3kG_10M")
-#' gigwa_set_project("3003_ind")
-#' gigwa_set_run("1")
-#' 
-#' # get associated metadata
-#' df2 <- gigwa_get_metadata()
-#' 
-#' # save current connection (before switch)
-#' con2 <- get_qbms_connection()
-#' 
-#' # load the saved phenotypic server connection
-#' set_qbms_connection(con1)
-#' 
-#' # continue retrieving germplasm attributes from the phenotypic server
-#' df3 <- get_germplasm_attributes("BASFCORN-2-1")
+#'   # Configure your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
+#'
+#'   # Login using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
+#'
+#'   # Select a crop by name
+#'   set_crop("wheat")
+#'
+#'   # Select a breeding program by name
+#'   set_program("Wheat International Nurseries")
+#'      
+#'   # Get germplasm data
+#'   df1 <- get_germplasm_data("Jabal")
+#'   
+#'   # Save the current connection (phenotypic server)
+#'   con1 <- get_qbms_connection()
+#'   
+#'   # Configure QBMS to connect to the genotypic server
+#'   set_qbms_config("https://gigwa.southgreen.fr/gigwa/", engine = "gigwa", no_auth = TRUE)
+#'   
+#'   # Set the db, project, and run
+#'   gigwa_set_db("DIVRICE_NB")
+#'   gigwa_set_project("refNB")
+#'   gigwa_set_run("03052022")
+#'   
+#'   # Get associated metadata
+#'   df2 <- gigwa_get_metadata()
+#'   
+#'   # Save the current connection (before switch)
+#'   con2 <- get_qbms_connection()
+#'   
+#'   # Load the saved phenotypic server connection
+#'   set_qbms_connection(con1)
+#'   
+#'   # Continue retrieving germplasm attributes from the phenotypic server
+#'   df3 <- get_germplasm_attributes("Jabal")
 #' }
+#'
 #' @export
 
 get_qbms_connection <- function() {
@@ -111,50 +261,60 @@ get_qbms_connection <- function() {
 }
 
 
-#' Set the QBMS connection
+#' Set the QBMS Connection
 #'
 #' @description
-#' Set the QBMS connection object to the current environment
+#' Sets the QBMS connection object to the current environment.
 #'
-#' @param env a list of the connection config and status to load
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @param env A list containing the connection configuration and status to load.
+#'
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#'
 #' @seealso \code{\link{get_qbms_connection}}
+#'
 #' @examples
 #' if(interactive()) {
-#' # configure QBMS to connect the phenotypics server
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench/controller/auth/login")
-#' 
-#' # login, set the crop, and program
-#' login_bms()
-#' set_crop("maize")
-#' set_program("MC Maize")
-#' 
-#' # get germplasm data
-#' df1 <- get_germplasm_data("BASFCORN-2-1")
-#' 
-#' # save current connection (phenotypic server)
-#' con1 <- get_qbms_connection()
-#' 
-#' # configure QBMS to connect the genotypic server
-#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", engine = "gigwa", no_auth = TRUE)
-#' 
-#' # set the db, project, and run
-#' gigwa_set_db("3kG_10M")
-#' gigwa_set_project("3003_ind")
-#' gigwa_set_run("1")
-#' 
-#' # get associated metadata
-#' df2 <- gigwa_get_metadata()
-#' 
-#' # save current connection (before switch)
-#' con2 <- get_qbms_connection()
-#' 
-#' # load the saved phenotypic server connection
-#' set_qbms_connection(con1)
-#' 
-#' # continue retrieving germplasm attributes from the phenotypic server
-#' df3 <- get_germplasm_attributes("BASFCORN-2-1")
+#'   # Configure your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
+#'
+#'   # Login using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
+#'
+#'   # Select a crop by name
+#'   set_crop("wheat")
+#'
+#'   # Select a breeding program by name
+#'   set_program("Wheat International Nurseries")
+#'      
+#'   # Get germplasm data
+#'   df1 <- get_germplasm_data("Jabal")
+#'   
+#'   # Save the current connection (phenotypic server)
+#'   con1 <- get_qbms_connection()
+#'   
+#'   # Configure QBMS to connect to the genotypic server
+#'   set_qbms_config("https://gigwa.southgreen.fr/gigwa/", engine = "gigwa", no_auth = TRUE)
+#'   
+#'   # Set the db, project, and run
+#'   gigwa_set_db("DIVRICE_NB")
+#'   gigwa_set_project("refNB")
+#'   gigwa_set_run("03052022")
+#'   
+#'   # Get associated metadata
+#'   df2 <- gigwa_get_metadata()
+#'   
+#'   # Save the current connection (before switch)
+#'   con2 <- get_qbms_connection()
+#'   
+#'   # Load the saved phenotypic server connection
+#'   set_qbms_connection(con1)
+#'   
+#'   # Continue retrieving germplasm attributes from the phenotypic server
+#'   df3 <- get_germplasm_attributes("Jabal")
 #' }
+#'
 #' @export
 
 set_qbms_connection <- function(env) {
@@ -171,45 +331,56 @@ set_qbms_connection <- function(env) {
 }
 
 
-#' Configure BMS server settings
+#' Configure BMS Server Settings
 #'
 #' @description
-#' Set the connection configuration of the BMS server
+#' Sets the connection configuration of the BMS server.
 #'
-#' @param url       URL of the BMS login page (default is "http://localhost/ibpworkbench/")
-#' @param path      BMS API path (default is NULL)
-#' @param page_size Page size (default is 1000)
-#' @param time_out  Number of seconds to wait for a response until giving up (default is 10)
-#' @param no_auth   TRUE if the server doesn't require authentication/login (default is FALSE)
-#' @param engine    Backend database (qbms default, breedbase, gigwa)
-#' @param verbose   Logical indicating if progress bar will display on the console when retrieve data from API (TRUE by default).
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @return no return value
+#' @param url URL of the BMS login page. Default is "http://localhost/ibpworkbench/".
+#' @param path API path. Default is NULL.
+#' @param page_size Page size. Default is 1000.
+#' @param time_out Number of seconds to wait for a response until giving up. Default is 10.
+#' @param no_auth TRUE if the server doesn't require authentication/login. Default is FALSE.
+#' @param engine Backend database (bms default, breedbase, gigwa, ebs).
+#' @param brapi_ver BrAPI version (v1 or v2).
+#' @param verbose Logical indicating if progress bar will display on the console when retrieving data from API. TRUE by default.
+#'
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#'
+#' @return
+#' No return value.
+#'
 #' @examples
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#' set_qbms_config("https://bmsdev-brapi.ibp.services/ibpworkbench")
+#'
 #' @export
 
 set_qbms_config <- function(url = "http://localhost/ibpworkbench/controller/auth/login",
-                            path = NULL, page_size = 1000, time_out = 120,
-                            no_auth = FALSE, engine = "bms", verbose = TRUE) {
+                            path = NULL, page_size = 1000, time_out = 120, no_auth = FALSE, 
+                            engine = "bms", brapi_ver = "v1", verbose = TRUE) {
   
   if (is.null(path)) {
     if (engine == "bms") { path = "bmsapi" }
     if (engine == "breedbase") { path = "" }
     if (engine == "gigwa") { path = "gigwa/rest"}
+    if (engine == "ebs") { path = "" }
   }
   
-  qbms_globals$config <- list(crop = NULL)
+  qbms_globals$config <- list(crop = "")
   qbms_globals$state  <- list(token = NULL)
+  
+  if (engine == "bms") { qbms_globals$config$crop <- NULL }
   
   qbms_globals$config$server    <- regmatches(url, regexpr("^(?://|[^/]+)*", url))
   qbms_globals$config$path      <- path
   qbms_globals$config$page_size <- page_size
   qbms_globals$config$time_out  <- time_out
-  qbms_globals$config$base_url  <- paste0(qbms_globals$config$server, "/", qbms_globals$config$path)
+  qbms_globals$config$base_url  <- paste0(qbms_globals$config$server, ifelse(path == "", "", paste0("/", path)))
   qbms_globals$config$engine    <- engine
+  qbms_globals$config$brapi_ver <- brapi_ver
   qbms_globals$config$verbose   <- verbose
-
+  
   if (no_auth == TRUE) {
     qbms_globals$state$token <- NA
   }
@@ -218,29 +389,33 @@ set_qbms_config <- function(url = "http://localhost/ibpworkbench/controller/auth
 }
 
 
-#' Common HTTP headers to send
+#' Common HTTP Headers to Send
 #'
 #' @description
-#' Build the list of common HTTP headers to send with each API call
+#' Builds the list of common HTTP headers to send with each API call.
 #'
-#' @return A list of common HTTP headers to send.
+#' @return
+#' A list of common HTTP headers to send.
 
 brapi_headers <- function() {
   auth_code <- paste0("Bearer ", qbms_globals$state$token)
-  headers   <- c("Authorization" = auth_code, "Accept-Encoding" = "gzip, deflate")
-
+  headers   <- c("Authorization" = auth_code, 
+                 "Accept-Encoding" = "gzip, deflate",
+                 "accept" = "application/json")
   headers
 }
 
 
-#' Async version of HTTP GET request
+#' Async Version of HTTP GET Request
 #'
 #' @description
-#' A small helper function to create `async` version of the original HTTP GET request.
+#' A small helper function to create an `async` version of the original HTTP GET request.
 #'
-#' @param full_url URL to retrieve
-#' @param nested   Don't flatten nested data.frames
-#' @return Async version of HTTP GET request.
+#' @param full_url URL to retrieve.
+#' @param nested Logical indicating whether to flatten nested data frames. Default is FALSE.
+#' 
+#' @return
+#' Async version of the HTTP GET request.
 
 get_async_page <- function(full_url, nested) {
 }
@@ -256,15 +431,17 @@ if (requireNamespace("async", quietly = TRUE)) {
 }
 
 
-#' Run all supplied pages
+#' Run All Supplied Pages
 #'
 #' @description
 #' A small helper function to create a deferred value that is resolved when all 
 #' listed pages are resolved.
 #'
-#' @param pages  List of URLs to retrieve
-#' @param nested Don't flatten nested data.frames
-#' @return Async deferred object.
+#' @param pages List of URLs to retrieve.
+#' @param nested Logical indicating whether to flatten nested data frames. Default is FALSE.
+#' 
+#' @return
+#' Async deferred object.
 
 get_async_pages <- function(pages, nested) {
 }
@@ -278,22 +455,26 @@ if (requireNamespace("async", quietly = TRUE)) {
 }
 
 
-#' Internal function used for core BrAPI GET calls
+#' Internal Function Used for Core BrAPI GET Calls
 #'
 #' @description
-#' This function created for *internal use only* to cal BrAPI in GET method and
-#' retrieve the rough response data and send back the results. This function take
-#' care of pagination, authentication, encoding, compress, decode JSON response, etc.
+#' This function is created for *internal use only* to call BrAPI in the GET method and
+#' retrieve the raw response data and send back the results. This function takes
+#' care of pagination, authentication, encoding, compression, decoding JSON response, etc.
 #'
-#' @param call_url BrAPI URL to call in GET method
-#' @param nested   If FALSE, then retrieved JSON data will be flatten (default is TRUE)
-#' @return result object returned by JSON API response
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @param call_url BrAPI URL to call in GET method.
+#' @param nested Logical indicating whether retrieved JSON data will be flattened. Default is TRUE.
+#' 
+#' @return
+#' Result object returned by the JSON API response.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
 
 brapi_get_call <- function(call_url, nested = TRUE) {
   separator <- if (grepl("\\?", call_url)) "&" else "?"
   full_url  <- paste0(call_url, separator, "page=0&pageSize=", qbms_globals$config$page_size)
-  
+
   headers  <- brapi_headers()
   response <- httr::GET(url = utils::URLencode(full_url),
                         httr::add_headers(headers),
@@ -384,12 +565,16 @@ if (requireNamespace("async", quietly = TRUE)) {
 }
 
 
-#' Login pop-up window
+#' Login Pop-Up Window
 #'
-#' Build a GUI pop-up window using Tcl/Tk to insert BMS username and password
+#' @description
+#' Builds a GUI pop-up window using Tcl/Tk to insert the username and password.
 #'
-#' @return a vector of inserted username and password
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @return
+#' A vector of inserted username and password.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
 
 get_login_details <- function() {
   if (is.null(qbms_globals$config$engine)) {
@@ -433,35 +618,108 @@ get_login_details <- function() {
 }
 
 
-#' Login to the server
+#' Set Access Token Response
 #'
 #' @description
-#' Connect to the server. If username or password parameters are missing,
-#' then a login window will pop-up to insert username and password.
+#' If the request for an access token is valid, the authorization server needs 
+#' to generate an access token and return these to the client, typically along 
+#' with some additional properties about the authorization.
 #'
-#' All other connection parameters (i.e. server IP or domain, connection port,
-#' API path, and connection protocol e.g. http://) will retrieve from the
-#' qbms_config list.
-#'
-#' This function will update both of the qbms_config list (brapi connection
-#' object in the con key) and qbms_state list (token value in the token key).
-#'
-#' @param username the username (optional, default is NULL)
-#' @param password the password (optional, default is NULL)
-#' @return no return value
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @examples
-#' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
-#'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
-#' }
+#' @param token The access token string as issued by the authorization server.
+#' @param user The username (optional).
+#' @param expires_in The lifetime in seconds of the access token (optional).
+#' 
+#' @return
+#' No return value.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
 #' @export
 
-login_bms <- function(username = NULL, password = NULL) {
+set_token <- function(token, user = '', expires_in = NULL) {
+  if (is.null(expires_in)) {
+    expires_in <- as.numeric(Sys.time()) + 3600
+  }
+  
+  qbms_globals$state$token <- token
+  qbms_globals$state$user  <- user
+  qbms_globals$state$expires_in <- expires_in
+}
+
+
+#' Login Using OAuth 2.0 Authentication 
+#'
+#' @description
+#' If the request for an access token is valid, the authorization server needs 
+#' to generate an access token and return these to the client, typically along 
+#' with some additional properties about the authorization.
+#'
+#' @param authorize_url URL to send the client for authorization.
+#' @param access_url URL used to exchange unauthenticated for authenticated token.
+#' @param client_id Consumer key, also sometimes called the client ID.
+#' @param client_secret Consumer secret, also sometimes called the client secret.
+#' @param redirect_uri The URL that the user will be redirected to after authorization is complete (default is http://localhost:1410).
+#' @param oauth2_cache A logical value or a string. TRUE means to cache using the default cache file .httr-oauth, FALSE means don't cache, 
+#'                     and NA means to guess using some sensible heuristics. A string means use the specified path as the cache file.
+#'                     Default is FALSE (i.e., don't cache).
+#' 
+#' @return
+#' No return value.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @export
+
+login_oauth2 <- function(authorize_url, access_url, client_id, client_secret = NULL, redirect_uri = "http://localhost:1410", oauth2_cache = FALSE) {
+  app <- httr::oauth_app(appname = "QBMS", key = client_id, secret = client_secret, redirect_uri = redirect_uri)
+  
+  endpoint <- httr::oauth_endpoint(authorize = authorize_url, access = access_url)
+  
+  token <- httr::oauth2.0_token(endpoint, app, cache = oauth2_cache)
+  
+  set_token(token$credentials$id_token, '', token$credentials$expires_in)
+}
+
+
+#' Login to the Server
+#'
+#' @description
+#' Connects to the server. If the username or password parameters are missing,
+#' then a login window will pop up to insert the username and password.
+#'
+#' All other connection parameters (i.e., server IP or domain, connection port,
+#' API path, and connection protocol e.g., http://) will be retrieved from the
+#' qbms_config list.
+#'
+#' This function will update both the qbms_config list (brapi connection
+#' object in the con key) and the qbms_state list (token value in the token key).
+#'
+#' @param username The username (optional, default is NULL).
+#' @param password The password (optional, default is NULL).
+#' @param encoding How should the named list body be encoded? Can be one of form 
+#'                 (application/x-www-form-urlencoded), multipart (multipart/form-data), 
+#'                 or json (application/json).
+#' 
+#' @return
+#' No return value.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @examples
+#' if(interactive()) {
+#'   # Configure your BMS connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
+#'
+#'   # Login using your BMS account (interactive mode)
+#'   # You can pass the BMS username and password as parameters (batch mode)
+#'   login_bms()
+#' }
+#' 
+#' @export
+
+login_bms <- function(username = NULL, password = NULL, encoding = "json") {
   if (is.null(username) || is.null(password)) {
     credentials <- get_login_details()
   } else {
@@ -471,37 +729,71 @@ login_bms <- function(username = NULL, password = NULL) {
   call_url  <- paste0(qbms_globals$config$base_url, "/brapi/v1/token")
   call_body <- list(username = credentials["usr"], password = credentials["pwd"])
 
-  response <- httr::POST(url = utils::URLencode(call_url), body = call_body, encode = "json",
+  response <- httr::POST(url = utils::URLencode(call_url), body = call_body, encode = encoding,
                          httr::timeout(qbms_globals$config$time_out))
 
   if (!is.null(httr::content(response)$errors)) {
     stop(httr::content(response)$errors[[1]]$message)
   }
 
-  qbms_globals$state$token <- httr::content(response)$access_token
-  qbms_globals$state$user  <- httr::content(response)$userDisplayName
-  # as.POSIXct(qbms_globals$state$expires_in/1000, origin="1970-01-01")
-  qbms_globals$state$expires_in <- httr::content(response)$expires_in
+  set_token(httr::content(response)$access_token,
+            httr::content(response)$userDisplayName,
+            httr::content(response)$expires_in)
 }
 
 
-#' Get the list of supported crops
+#' Login to the BreedBase Server
 #'
-#' @return a list of supported crops
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}
+#' @description
+#' Logs in to the BreedBase server.
+#'
+#' @param username The username (optional, default is NULL).
+#' @param password The password (optional, default is NULL).
+#' 
+#' @return
+#' No return value.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @export
+
+login_breedbase <- function(username = NULL, password = NULL) {
+  login_bms(username, password, encoding = "form")
+  
+  if (is.null(qbms_globals$state$token)) {
+    stop("Bad credentials") 
+  }
+}
+
+
+#' Get the List of Supported Crops
+#'
+#' @description
+#' Retrieves the list of supported crops.
+#'
+#' @return
+#' A list of supported crops.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso
+#' \code{\link{login_bms}}
+#' 
 #' @examples
 #' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#'   # Configure your BMS connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
 #'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
+#'   # Login using your BMS account (interactive mode)
+#'   # You can pass the BMS username and password as parameters (batch mode)
+#'   login_bms()
 #'
-#' # list supported crops in the bms server
-#' list_crops()
+#'   # List supported crops in the BMS server
+#'   list_crops()
 #' }
+#' 
 #' @export
 
 list_crops <- function() {
@@ -512,7 +804,8 @@ list_crops <- function() {
   if (!is.null(qbms_globals$state$crops)) {
     bms_crops <- qbms_globals$state$crops
   } else {
-    call_url  <- paste0(qbms_globals$config$base_url, "/brapi/v1/crops")
+    call_url  <- paste0(qbms_globals$config$base_url, "/brapi/", qbms_globals$config$brapi_ver, "/", 
+                        brapi_map[brapi_map$func_name == "list_crops" & brapi_map$brapi_ver == qbms_globals$config$brapi_ver, "brapi_call"])
     bms_crops <- brapi_get_call(call_url)$data
 
     qbms_globals$state$crops <- bms_crops
@@ -522,27 +815,36 @@ list_crops <- function() {
 }
 
 
-#' Set the current active crop
+#' Set the Current Active Crop
 #'
 #' @description
-#' This function will update the current active crop in the internal
-#' configuration object (including the brapi connection object).
+#' Updates the current active crop in the internal configuration object (including 
+#' the BrAPI connection object).
 #'
-#' @param crop_name the name of the crop
-#' @return no return value
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{list_crops}}
+#' @param crop_name The name of the crop.
+#' 
+#' @return
+#' No return value.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso
+#' \code{\link{login_bms}}, \code{\link{list_crops}}
+#' 
 #' @examples
 #' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#'   # Configure your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
 #'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
+#'   # Login using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
 #'
-#' set_crop("maize")
+#'   # Select a crop by name
+#'   set_crop("wheat")
 #' }
+#' 
 #' @export
 
 set_crop <- function(crop_name) {
@@ -552,41 +854,45 @@ set_crop <- function(crop_name) {
     stop("Your crop name is not supported in this connected BMS server! You may use the `list_crops()` function to check the available crops")
   }
 
-  if (qbms_globals$config$engine == "breedbase") {
-    qbms_globals$config$crop <- ""
-  } else {
-    qbms_globals$config$crop <- crop_name
-  }
+  qbms_globals$config$crop <- crop_name
   
   qbms_globals$state$programs  <- NULL
   qbms_globals$state$locations <- NULL
+  qbms_globals$state$variables <- NULL
 }
 
 
-#' Get the list of breeding programs names
+#' Get the List of Breeding Programs Names
 #'
 #' @description
-#' This function will retrieve the breeding programs list from the current active
-#' crop as configured in the internal configuration object using `set_crop()`
-#' function.
+#' Retrieves the breeding programs list from the current active crop as configured 
+#' in the internal configuration object using `set_crop()` function.
 #'
-#' @return a list of breeding programs names
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}
+#' @return
+#' A list of breeding programs names.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso
+#' \code{\link{login_bms}}, \code{\link{set_crop}}
+#' 
 #' @examples
 #' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#'   # Configure your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
 #'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
+#'   # Login using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
 #'
-#' set_crop("maize")
+#'   # Select a crop by name
+#'   set_crop("wheat")
 #'
-#' # list existing breeding programs
-#' list_programs()
+#'   # List existing breeding programs
+#'   list_programs()
 #' }
+#' 
 #' @export
 
 list_programs <- function() {
@@ -598,51 +904,61 @@ list_programs <- function() {
     stop("No crop has been selected yet! You have to set your crop first using the `set_crop()` function")
   }
 
-  if (!is.null(qbms_globals$state$programs)) {
-    bms_programs <- as.data.frame(qbms_globals$state$programs[, 1])
-  } else {
-    call_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop, "/brapi/v1/programs")
-    
+  if (is.null(qbms_globals$state$programs)) {
+    call_url <- paste0(qbms_globals$config$base_url, 
+                       ifelse(qbms_globals$config$crop == "", "", paste0("/", qbms_globals$config$crop)), 
+                       "/brapi/", qbms_globals$config$brapi_ver, "/", 
+                       brapi_map[brapi_map$func_name == "list_programs" & brapi_map$brapi_ver == qbms_globals$config$brapi_ver, "brapi_call"])
+
     results <- brapi_get_call(call_url)$data
     
-    if (qbms_globals$config$engine == "breedbase") {
-      bms_programs <- results[c("programName")]
-    } else {
+    if (qbms_globals$config$engine == "bms") {
       bms_programs <- results[c("name")]
+      colnames(bms_programs) <- c("programName")
+    } else {
+      bms_programs <- results[c("programName")]
     }
 
     qbms_globals$state$programs <- cbind(bms_programs, results[c("programDbId")])
   }
   
-  return(bms_programs)
+  return(subset(qbms_globals$state$programs, select = "programName"))
 }
 
 
-#' Set the current active breeding program
+#' Set the Current Active Breeding Program
 #'
 #' @description
-#' This function will update the current active breeding program in the
-#' internal state object using the programDbId retrieved from BMS which is
-#' associated to the given program_name parameter.
+#' Updates the current active breeding program in the internal state object 
+#' using the programDbId which is associated with the given program_name parameter.
 #'
-#' @param program_name the name of the breeding program
-#' @return no return value
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{list_programs}}
+#' @param program_name The name of the breeding program.
+#' 
+#' @return
+#' No return value.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso
+#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{list_programs}}
+#' 
 #' @examples
 #' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#'   # Configure your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
 #'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
+#'   # Login using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
 #'
-#' set_crop("maize")
+#'   # Select a crop by name
+#'   set_crop("wheat")
 #'
-#' # select a breeding program by name
-#' set_program("MC Maize")
+#'   # Select a breeding program by name
+#'   set_program("Wheat International Nurseries")
 #' }
+#' 
 #' @export
 
 set_program <- function(program_name) {
@@ -660,25 +976,34 @@ set_program <- function(program_name) {
 }
 
 
-#' Internal function used to retrieve the rough list of trials
+#' Internal Function Used to Retrieve the Rough List of Trials
 #'
 #' @description
-#' This function created for *internal use only* to retrieve the rough list of trials
-#' from the pre-selected (i.e. currently active) crop and breeding program combination
+#' This function is created for *internal use only* to retrieve the raw list of trials
+#' from the pre-selected (i.e., currently active) crop and breeding program combination
 #' as already configured in the internal state object using `set_crop()` and `set_program()`
-#' functions respectively.
+#' functions, respectively.
 #'
-#' @return a list of trials information
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{list_trials}}
+#' @return
+#' A list of trials information.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso
+#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{list_trials}}
 
 get_program_trials <- function() {
   if (!is.null(qbms_globals$state$trials)) {
     bms_program_trials <- qbms_globals$state$trials
   } else {
-    call_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop,
-                       "/brapi/v1/trials?programDbId=", qbms_globals$state$program_db_id)
-  
+    call_url <- paste0(qbms_globals$config$base_url, 
+                       ifelse(qbms_globals$config$crop == "", "", paste0("/", qbms_globals$config$crop)), 
+                       "/brapi/", qbms_globals$config$brapi_ver, "/", 
+                       brapi_map[brapi_map$func_name == "get_program_trials" & brapi_map$brapi_ver == qbms_globals$config$brapi_ver, "brapi_call"])
+    
+    call_url <- sub("\\{programDbId\\}", qbms_globals$state$program_db_id, call_url)
+    
     bms_program_trials <- brapi_get_call(call_url, FALSE)$data
     
     qbms_globals$state$trials <- bms_program_trials
@@ -688,37 +1013,45 @@ get_program_trials <- function() {
 }
 
 
-#' Get the list of trials in the current active breeding program
+#' Get the List of Trials in the Current Active Breeding Program
 #'
 #' @description
-#' This function will retrieve the trials list from the current active breeding
-#' program as configured in the internal state object using `set_program()`
-#' function.
+#' Retrieves the trials list from the current active breeding program as configured 
+#' in the internal state object using `set_program()` function.
 #'
-#' @param year the starting year to filter the list of trials (optional, default is NULL)
-#' @return a list of trials names
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}
+#' @param year The starting year to filter the list of trials (optional, default is NULL).
+#' 
+#' @return
+#' A list of trials names.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso
+#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}
+#' 
 #' @examples
 #' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#'   # Configure your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
 #'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
+#'   # Login using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
 #'
-#' set_crop("maize")
+#'   # Select a crop by name
+#'   set_crop("wheat")
 #'
-#' # select a breeding program by name
-#' set_program("MC Maize")
+#'   # Select a breeding program by name
+#'   set_program("Wheat International Nurseries")
 #'
-#' # list all studies/trials in the selected program
-#' list_trials()
+#'   # List all studies/trials in the selected program
+#'   list_trials()
 #'
-#' # filter listed studies/trials by year
-#' list_trials(2020)
+#'   # Filter listed studies/trials by year
+#'   list_trials(2022)
 #' }
+#' 
 #' @export
 
 list_trials <- function(year = NULL) {
@@ -730,8 +1063,8 @@ list_trials <- function(year = NULL) {
     stop("Year parameter should be numeric")
   }
 
-  if (!is.null(year) && qbms_globals$config$engine == "breedbase") {
-    stop("Year parameter is not supported in BreedBase!")
+  if (!is.null(year) && qbms_globals$config$engine != "bms") {
+    stop("Year parameter is not supported in this database!")
   }
 
   bms_trials <- get_program_trials()
@@ -752,34 +1085,42 @@ list_trials <- function(year = NULL) {
 }
 
 
-#' Set the current active trial
+#' Set the Current Active Trial
 #'
 #' @description
-#' This function will update the current active trial in the internal state
-#' object using the trialDbId retrieved from BMS which is associated to the
-#' given trial_name parameter.
+#' Updates the current active trial in the internal state object using the 
+#' trialDbId which is associated with the given trial_name parameter.
 #'
-#' @param trial_name the name of the trial
-#' @return no return value
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{list_trials}}
+#' @param trial_name The name of the trial.
+#' 
+#' @return
+#' No return value.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso
+#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{list_trials}}
+#' 
 #' @examples
 #' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#'   # Configure your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
 #'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
+#'   # Login using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
 #'
-#' set_crop("maize")
+#'   # Select a crop by name
+#'   set_crop("wheat")
 #'
-#' # select a breeding program by name
-#' set_program("MC Maize")
+#'   # Select a breeding program by name
+#'   set_program("Wheat International Nurseries")
 #'
-#' # select a specific study/trial by name
-#' set_trial("2018 PVT")
+#'   # Select a specific study/trial by name
+#'   set_trial("IDYT39")
 #' }
+#' 
 #' @export
 
 set_trial <- function(trial_name) {
@@ -796,38 +1137,47 @@ set_trial <- function(trial_name) {
   qbms_globals$state$trial_db_id <- as.character(bms_trials[trial_row, c("trialDbId")])
   
   qbms_globals$state$studies <- NULL
+  qbms_globals$state$observationVariableDbIds <- NULL
 }
 
 
-#' Get the list of studies in the current active trial
+#' Get the List of Studies in the Current Active Trial
 #'
 #' @description
-#' This function will retrieve the studies list from the current active trial
-#' as configured in the internal state object using `set_trial()` function.
+#' Retrieves the studies list from the current active trial as configured in the 
+#' internal state object using `set_trial()` function.
 #'
-#' @return a list of study and location names
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}}
+#' @return
+#' A list of study and location names.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso
+#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}}
+#' 
 #' @examples
 #' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#'   # Configure your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
 #'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
+#'   # Login using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
 #'
-#' set_crop("maize")
+#'   # Select a crop by name
+#'   set_crop("wheat")
 #'
-#' # select a breeding program by name
-#' set_program("MC Maize")
+#'   # Select a breeding program by name
+#'   set_program("Wheat International Nurseries")
 #'
-#' # select a specific study/trial by name
-#' set_trial("2018 PVT")
+#'   # Select a specific study/trial by name
+#'   set_trial("IDYT39")
 #'
-#' # list all environments/locations information in the selected study/trial
-#' list_studies()
+#'   # List all environments/locations information in the selected study/trial
+#'   list_studies()
 #' }
+#' 
 #' @export
 
 list_studies <- function() {
@@ -838,114 +1188,147 @@ list_studies <- function() {
   if (!is.null(qbms_globals$state$studies)) {
     studies <- qbms_globals$state$studies
   } else {
-    bms_trials <- get_program_trials()
+    call_url <- paste0(qbms_globals$config$base_url, 
+                       ifelse(qbms_globals$config$crop == "", "", paste0("/", qbms_globals$config$crop)), 
+                       "/brapi/", qbms_globals$config$brapi_ver, "/", 
+                       brapi_map[brapi_map$func_name == "list_studies" & brapi_map$brapi_ver == qbms_globals$config$brapi_ver, "brapi_call"])
     
-    trial_row <- which(bms_trials$trialDbId == qbms_globals$state$trial_db_id)
+    call_url <- sub("\\{trialDbId\\}", qbms_globals$state$trial_db_id, call_url)
     
-    studies <- bms_trials[trial_row, c("studies")][[1]][, c("studyName", "locationName")]
+    # handle the case of BreedBase trials (studies) listed in the root program folder (trial)
+    if (qbms_globals$config$engine == "breedbase" && qbms_globals$state$trial_db_id == qbms_globals$state$program_db_id) {
+      call_url <- sub("\\?trialDbId\\=", '?programDbId=', call_url)
+    }
+
+    bms_trial_studies <- brapi_get_call(call_url, FALSE)$data
     
+    # handle the case of BreedBase trials (studies) listed in the root program folder (trial)
+    if (qbms_globals$config$engine == "breedbase" && qbms_globals$state$trial_db_id == qbms_globals$state$program_db_id) {
+      bms_trial_studies <- bms_trial_studies[is.na(bms_trial_studies$trialName), ]
+      rownames(bms_trial_studies) <- NULL
+    }
+    
+    if (nrow(bms_trial_studies) == 0) {
+      stop("No studies in the selected trial! Please check what you have set in the `set_trial()` function")
+    }
+    
+    studies <- bms_trial_studies[, c("studyName", "locationName", "studyDbId")]
+
     qbms_globals$state$studies <- studies
   }
   
-  return(studies)
+  return(studies[, c("studyName", "locationName")])
 }
 
 
-#' Set the current active study by location name
+#' Set the Current Active Study
 #'
 #' @description
-#' This function will update the current active study in the internal state
-#' object using the studyDbId retrieved from BMS which is associated to the
-#' given study_name parameter.
+#' Updates the current active study in the internal state object using the 
+#' studyDbId, which is associated with the given study_name 
+#' parameter.
 #'
-#' @param study_name the name of the study
-#' @return no return value
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}},
-#'          \code{\link{set_trial}}, \code{\link{list_studies}}
+#' @param study_name The name of the study.
+#' 
+#' @return
+#' No return value.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso
+#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}}, \code{\link{list_studies}}
+#' 
 #' @examples
 #' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#'   # Configure your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
 #'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
+#'   # Login using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
 #'
-#' set_crop("maize")
+#'   # Select a crop by name
+#'   set_crop("wheat")
 #'
-#' # select a breeding program by name
-#' set_program("MC Maize")
+#'   # Select a breeding program by name
+#'   set_program("Wheat International Nurseries")
 #'
-#' # select a specific study/trial by name
-#' set_trial("2018 PVT")
+#'   # Select a specific study/trial by name
+#'   set_trial("IDYT39")
 #'
-#' # select a specific environment/location dataset
-#' set_study("2018 PVT Environment Number 1")
+#'   # Select a specific environment/location dataset
+#'   set_study("IDYT39 Environment Number 9")
 #' }
+#' 
 #' @export
 
 set_study <- function(study_name) {
   valid_studies <- list_studies()
 
   if (!study_name %in% valid_studies$studyName) {
-    stop("Your location name is not exists in this trial! You may use the `list_studies()` function to check the available study location names")
+    stop("Your study name is not exists in this trial! You may use the `list_studies()` function to check the available study names")
   }
 
-  bms_trials <- get_program_trials()
+  study_db_id <- qbms_globals$state$studies[qbms_globals$state$studies$studyName == study_name, "studyDbId"]
 
-  trial_row <- which(bms_trials$trialDbId == qbms_globals$state$trial_db_id)
-
-  bms_studies <- bms_trials[trial_row, c("studies")][[1]]
-
-  study_row <- which(bms_studies$studyName == study_name)
-
-  qbms_globals$state$study_db_id <- as.character(bms_studies[study_row, "studyDbId"])
+  qbms_globals$state$study_db_id <- as.character(study_db_id)
 }
 
 
-#' Get the details/metadata of the current active study
+#' Get the Details/Metadata of the Current Active Study
 #'
 #' @description
-#' This function will retrieve the details/metadata of the current active study
-#' as configured in the internal state object using `set_study()` function.
+#' Retrieves the details/metadata of the current active study as configured in 
+#' the internal state object using `set_study()` function.
 #'
-#' @return a data frame of the study details/metadata
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}},
-#'          \code{\link{set_trial}}, \code{\link{set_study}}
+#' @return
+#' A data frame of the study details/metadata.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso
+#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}}, \code{\link{set_study}}
+#' 
 #' @examples
 #' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#'   # Configure your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
 #'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
+#'   # Login using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
 #'
-#' set_crop("maize")
+#'   # Select a crop by name
+#'   set_crop("wheat")
 #'
-#' # select a breeding program by name
-#' set_program("MC Maize")
+#'   # Select a breeding program by name
+#'   set_program("Wheat International Nurseries")
 #'
-#' # select a specific study/trial by name
-#' set_trial("2018 PVT")
+#'   # Select a specific study/trial by name
+#'   set_trial("IDYT39")
 #'
-#' # select a specific environment/location dataset
-#' set_study("2018 PVT Environment Number 1")
+#'   # Select a specific environment/location dataset
+#'   set_study("IDYT39 Environment Number 9")
 #'
-#' # retrieve the general information of the selected environment/location
-#' info <- get_study_info()
+#'   # Retrieve the general information of the selected environment/location
+#'   info <- get_study_info()
 #' }
+#' 
 #' @export
 
 get_study_info <- function() {
   if (is.null(qbms_globals$state$study_db_id)) {
     stop("No study has been selected yet! You have to set your study first using the `set_study()` function")
   }
-
-  crop_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop, "/brapi/v1")
-  call_url <- paste0(crop_url, "/studies/", qbms_globals$state$study_db_id)
+  
+  call_url <- paste0(qbms_globals$config$base_url, 
+                     ifelse(qbms_globals$config$crop == "", "", paste0("/", qbms_globals$config$crop)), 
+                     "/brapi/", qbms_globals$config$brapi_ver, "/", 
+                     brapi_map[brapi_map$func_name == "get_study_info" & brapi_map$brapi_ver == qbms_globals$config$brapi_ver, "brapi_call"])
+  
+  call_url <- sub("\\{studyDbId\\}", qbms_globals$state$study_db_id, call_url)
 
   study_info <- brapi_get_call(call_url)
   
@@ -953,125 +1336,175 @@ get_study_info <- function() {
     study_info_df <- NULL
   } else {
     study_info_df <- as.data.frame(t(as.matrix(do.call(c, unlist(study_info, recursive = FALSE)))))
-    
-    # study_info_df <- data.frame(study_info[, 1])
-    # for(i in 2:ncol(study_info)) study_info_df[, i] <- study_info[, i]
   }
 
   return(study_info_df)
 }
 
 
-#' Get the observations data of the current active study
+#' Get the Observations Data of the Current Active Study
 #'
 #' @description
-#' This function will retrieve the observations data of the current active study
-#' as configured in the internal state object using `set_study()` function.
+#' Retrieves the observations data of the current active study as configured in 
+#' the internal state object using `set_study()` function.
 #'
-#' @return a data frame of the study observations data
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}},
-#'          \code{\link{set_trial}}, \code{\link{set_study}}
+#' @return
+#' A data frame of the study observations data.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso
+#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}}, \code{\link{set_study}}
+#' 
 #' @examples
 #' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#'   # Configure your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
 #'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
+#'   # Login using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
 #'
-#' set_crop("maize")
+#'   # Select a crop by name
+#'   set_crop("wheat")
 #'
-#' # select a breeding program by name
-#' set_program("MC Maize")
+#'   # Select a breeding program by name
+#'   set_program("Wheat International Nurseries")
 #'
-#' # select a specific study/trial by name
-#' set_trial("2018 PVT")
+#'   # Select a specific study/trial by name
+#'   set_trial("IDYT39")
 #'
-#' # select a specific environment/location dataset
-#' set_study("2018 PVT Environment Number 1")
+#'   # Select a specific environment/location dataset
+#'   set_study("IDYT39 Environment Number 9")
 #'
-#' # retrieve the data of the selected environment/location
-#' data <- get_study_data()
+#'   # Retrieve the data of the selected environment/location
+#'   data <- get_study_data()
 #' }
+#' 
 #' @export
 
 get_study_data <- function() {
   if (is.null(qbms_globals$state$study_db_id)) {
     stop("No study has been selected yet! You have to set your study first using the `set_study()` function")
   }
-
-  crop_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop, "/brapi/v1")
-  call_url <- paste0(crop_url, "/studies/", qbms_globals$state$study_db_id, "/table")
+  
+  call_url <- paste0(qbms_globals$config$base_url, 
+                     ifelse(qbms_globals$config$crop == "", "", paste0("/", qbms_globals$config$crop)), 
+                     "/brapi/", qbms_globals$config$brapi_ver, "/", 
+                     brapi_map[brapi_map$func_name == "get_study_data" & brapi_map$brapi_ver == qbms_globals$config$brapi_ver, "brapi_call"])
+  
+  call_url <- sub("\\{studyDbId\\}", qbms_globals$state$study_db_id, call_url)
 
   study_result <- brapi_get_call(call_url)
   
-  if (qbms_globals$config$engine == "breedbase") {
-    study_data <- as.data.frame(study_result$data[-1, ])
-    colnames(study_data) <- study_result$data[1, ]
-  } else {
-    study_data <- as.data.frame(study_result$data)
+  if (qbms_globals$config$brapi_ver == "v1") {
+    qbms_globals$state$observationVariableDbIds <- study_result$observationVariableDbIds
+  } else if (qbms_globals$config$brapi_ver == "v2") {
+    qbms_globals$state$observationVariableDbIds <- study_result$observationVariables$observationVariableDbId
   }
   
-  study_header <- c(study_result$headerRow, study_result$observationVariableNames)
+  study_data   <- as.data.frame(study_result$data)
+  
+  if (qbms_globals$config$engine == "breedbase") {
+    study_header <- study_data[1, ]
+    study_data   <- study_data[-1, ]
+    
+  } else if (qbms_globals$config$brapi_ver == "v1") {
+    study_header <- c(study_result$headerRow, 
+                      study_result$observationVariableNames)
+    
+  } else if (qbms_globals$config$brapi_ver == "v2") {
+    study_header <- c(study_result$headerRow, 
+                      study_result$observationVariables$observationVariableName)
+  }
+  
   if (nrow(study_data) > 0) {
     colnames(study_data) <- study_header
+  } else {
+    study_data <- NULL
   }
-  
+
   return(study_data)
 }
 
 
-#' Get the germplasm list of the current active study
+#' Get the Germplasm List of the Current Active Study
 #'
 #' @description
-#' This function will retrieve the germplasm list of the current active study
-#' as configured in the internal state object using `set_study()` function.
+#' Retrieves the germplasm list of the current active study as configured in the 
+#' internal state object using `set_study()` function.
 #'
-#' @return a data frame of the study germplasm list
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, 
-#'          \code{\link{set_trial}}, \code{\link{set_study}}
+#' @return
+#' A data frame of the study germplasm list.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso
+#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}}, \code{\link{set_study}}
+#' 
 #' @examples
 #' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#'   # Configure your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
 #'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
+#'   # Login using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
 #'
-#' set_crop("maize")
+#'   # Select a crop by name
+#'   set_crop("wheat")
 #'
-#' # select a breeding program by name
-#' set_program("MC Maize")
+#'   # Select a breeding program by name
+#'   set_program("Wheat International Nurseries")
 #'
-#' # select a specific study/trial by name
-#' set_trial("2018 PVT")
+#'   # Select a specific study/trial by name
+#'   set_trial("IDYT39")
 #'
-#' # select a specific environment/location dataset
-#' set_study("2018 PVT Environment Number 1")
+#'   # Select a specific environment/location dataset
+#'   set_study("IDYT39 Environment Number 9")
 #'
-#' # retrieve the germplasm list of the selected environment/location
-#' germplasm <- get_germplasm_list()
+#'   # Retrieve the germplasm list of the selected environment/location
+#'   germplasm <- get_germplasm_list()
 #' }
+#' 
 #' @export
 
 get_germplasm_list <- function() {
   if (is.null(qbms_globals$state$trial_db_id)) {
     stop("No trial has been selected yet! You have to set your trial first using the `set_trial()` function")
   }
+  
+  if (qbms_globals$config$brapi_ver == "v2" & is.null(qbms_globals$state$study_db_id)) {
+    stop("No study has been selected yet! You have to set your study first using the `set_study()` function")
+  }
 
-  crop_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop, "/brapi/v1")
-  call_url <- paste0(crop_url, "/studies/", qbms_globals$state$study_db_id, "/germplasm")
+  call_url <- paste0(qbms_globals$config$base_url, 
+                     ifelse(qbms_globals$config$crop == "", "", paste0("/", qbms_globals$config$crop)), 
+                     "/brapi/", qbms_globals$config$brapi_ver, "/", 
+                     brapi_map[brapi_map$func_name == "get_germplasm_list" & brapi_map$brapi_ver == qbms_globals$config$brapi_ver, "brapi_call"])
+  
+  call_url <- sub("\\{studyDbId\\}", qbms_globals$state$study_db_id, call_url)
 
-  germplasm_list <- brapi_get_call(call_url)$data
+  germplasm_list <- brapi_get_call(call_url, nested = FALSE)$data
 
+  if (qbms_globals$config$engine == "ebs") {
+    germplasm_list$check <- 0
+    
+    nested_lists <- c("synonyms", "donors", "externalReferences", "germplasmOrigin",
+                      "storageTypes", "taxonIds", "documentationURL", "additionalInfo")
+
+    germplasm_list[, nested_lists] <- NULL
+    germplasm_list <- germplasm_list[, colSums(is.na(germplasm_list)) != nrow(germplasm_list)]
+  }
+  
   if (qbms_globals$config$engine == "breedbase") {
     germplasm_list$check <- NA
     germplasm_list[, c("synonyms")] <- list(NULL)
-  } else {
+  }
+  
+  if (nrow(germplasm_list) > 0 & qbms_globals$config$engine == "bms") {
     # BMS POST /crops/{cropName}/programs/{programUUID}/studies/{studyId}/entries to extract entry type (test or check)
     call_url <- paste0(qbms_globals$config$base_url, "/crops/", qbms_globals$config$crop,
                        "/programs/", qbms_globals$state$program_db_id,
@@ -1083,7 +1516,7 @@ get_germplasm_list <- function() {
 
     results <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = TRUE)
 
-    germplasm_list <- merge(germplasm_list, results[, c("entryNumber", "properties.8255.value")], by = "entryNumber")
+    germplasm_list <- merge(germplasm_list, results[, c("entryNumber", "properties.8255.value", "gid")], by = "entryNumber")
 
     germplasm_list$check <- ifelse(germplasm_list$properties.8255.value == 10180, 1, 0)
 
@@ -1094,125 +1527,141 @@ get_germplasm_list <- function() {
 }
 
 
-#' Get the observations data of the current active trial
+#' Get the Observations Data of the Current Active Trial
 #'
 #' @description
-#' This function will retrieve the observations data of the current active trial
-#' (i.e. including all studies within) as configured in the internal state
-#' object using `set_trial()` function.
+#' Retrieves the observations data of the current active trial (i.e., including 
+#' all studies within) as configured in the internal state object using 
+#' `set_trial()` function.
 #'
-#' @return a data frame of the trial observations data
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}}
+#' @return
+#' A data frame of the trial observations data.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso
+#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}}
+#' 
 #' @examples
 #' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#'   # Configure your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
 #'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
+#'   # Login using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
 #'
-#' set_crop("maize")
+#'   # Select a crop by name
+#'   set_crop("wheat")
 #'
-#' # select a breeding program by name
-#' set_program("MC Maize")
+#'   # Select a breeding program by name
+#'   set_program("Wheat International Nurseries")
 #'
-#' # select a specific study/trial by name
-#' set_trial("2018 PVT")
+#'   # Select a specific study/trial by name
+#'   set_trial("IDYT39")
 #'
-#' # select a specific environment/location dataset
-#' set_study("2018 PVT Environment Number 1")
-#'
-#' # retrive multi-environment trial data
-#' MET <- get_trial_data()
+#'   # Retrieve multi-environment trial data
+#'   MET <- get_trial_data()
 #' }
+#' 
 #' @export
 
 get_trial_data <- function() {
-  trial_data <- data.frame()
   env <- list_studies()
 
   for (i in env$studyName) {
     set_study(i)
     study_data <- get_study_data()
-    trial_data <- rbind(trial_data, study_data)
+    
+    if (!exists('trial_data')) {
+      trial_data <- study_data
+    } else {
+      trial_data <- rbindx(trial_data, study_data)
+    }
   }
 
   return(trial_data)
 }
 
 
-#' Get the traits ontology/metadata of the current active trial
+#' Get the Traits Ontology/Metadata of the Current Active Trial
 #'
 #' @description
-#' This function will retrieve the traits ontology/metadata of the current active
-#' trial as configured in the internal state object using `set_trial()` function.
+#' Retrieves the traits ontology/metadata of the current active trial as 
+#' configured in the internal state object using the `set_trial()` function.
 #'
-#' @return a data frame of the traits ontology/metadata
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}}
+#' @return
+#' A data frame of the traits ontology/metadata.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso
+#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}}
+#' 
 #' @examples
 #' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#'   # Configure your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
 #'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
+#'   # Login using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
 #'
-#' set_crop("maize")
+#'   # Select a crop by name
+#'   set_crop("wheat")
 #'
-#' # select a breeding program by name
-#' set_program("MC Maize")
+#'   # Select a breeding program by name
+#'   set_program("Wheat International Nurseries")
 #'
-#' # select a specific study/trial by name
-#' set_trial("2018 PVT")
+#'   # Select a specific study/trial by name
+#'   set_trial("IDYT39")
 #'
-#' # get observation variable ontology
-#' ontology <- get_trial_obs_ontology()
+#'   # Get observation variable ontology
+#'   ontology <- get_trial_obs_ontology()
 #' }
+#' 
 #' @export
 
 get_trial_obs_ontology <- function() {
-  set_study(list_studies()[1, "studyName"])
-
-  crop_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop, "/brapi/v1")
-  call_url <- paste0(crop_url, "/studies/", qbms_globals$state$study_db_id, "/table")
-
-  study_data <- brapi_get_call(call_url)
-
-  if (qbms_globals$config$engine == "breedbase") {
-    ontology <- as.data.frame(study_data$observationVariableNames)
-
-    colnames(ontology) <- "observationVariableNames"
-  } else {
-    study_obs <- study_data$observationVariableDbIds
-
-    my_url <- paste0(qbms_globals$config$base_url, "/crops/", qbms_globals$config$crop,
-                     "/variables/filter?programUUID=", qbms_globals$state$program_db_id,
-                     "&variableIds=", paste(study_obs, collapse = ","))
-
-    response <- httr::GET(url = utils::URLencode(my_url),
-                          httr::add_headers("X-Auth-Token" = qbms_globals$state$token, "Accept-Encoding" = "gzip, deflate"),
-                          httr::timeout(qbms_globals$config$time_out))
-
-    ontology <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = TRUE)
+  if (is.null(qbms_globals$state$observationVariableDbIds)) {
+    stop("No data has been imported yet! You have to set get study data first using the `get_study_data()` function")
   }
+
+  if (!is.null(qbms_globals$state$variables)) {
+    ontology <- qbms_globals$state$variables
+  } else {
+    call_url <- paste0(qbms_globals$config$base_url, 
+                       ifelse(qbms_globals$config$crop == "", "", paste0("/", qbms_globals$config$crop)), 
+                       "/brapi/", qbms_globals$config$brapi_ver, "/", 
+                       brapi_map[brapi_map$func_name == "get_trial_obs_ontology" & brapi_map$brapi_ver == qbms_globals$config$brapi_ver, "brapi_call"])
+    
+    ontology <- brapi_get_call(call_url)$data
+    
+    qbms_globals$state$variables <- ontology
+  }
+  
+  ontology <- ontology[ontology$observationVariableDbId %in% qbms_globals$state$observationVariableDbIds, ]
 
   return(ontology)
 }
 
 
-#' Get the list of locations information of the current selected crop
+#' Get the List of Locations Information of the Current Selected Crop
 #'
 #' @description
-#' This function will retrieve the locations information of the current active crop
-#' as configured in the internal state object using `set_crop()` function.
+#' Retrieves the locations information of the current active crop as configured 
+#' in the internal state object using the `set_crop()` function.
 #'
-#' @return a data frame of the locations information
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}
+#' @return
+#' A data frame of the locations information.
+#' 
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso
+#' \code{\link{login_bms}}, \code{\link{set_crop}}
 
 list_locations <- function() {
   if (is.null(qbms_globals$config$crop)) {
@@ -1222,8 +1671,11 @@ list_locations <- function() {
   if (!is.null(qbms_globals$state$locations)) {
     location_list <- qbms_globals$state$locations
   } else {
-    call_url  <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop, "/brapi/v1/locations")
-    
+    call_url <- paste0(qbms_globals$config$base_url, 
+                       ifelse(qbms_globals$config$crop == "", "", paste0("/", qbms_globals$config$crop)), 
+                       "/brapi/", qbms_globals$config$brapi_ver, "/", 
+                       brapi_map[brapi_map$func_name == "list_locations" & brapi_map$brapi_ver == qbms_globals$config$brapi_ver, "brapi_call"])
+
     location_list <- brapi_get_call(call_url, FALSE)$data
 
     qbms_globals$state$locations <- location_list
@@ -1233,37 +1685,46 @@ list_locations <- function() {
 }
 
 
-#' Get the list of trials studies locations information of the current selected program
+#' Get the List of Trials/Studies/Locations Information of the Current Selected Program
 #'
 #' @description
-#' This function will retrieve all environments/locations information of the trials studies in the
-#' current active program as configured in the internal state object using `set_program()` function.
+#' Retrieves all environments/locations information of the trials studies in the 
+#' current active program as configured in the internal state object using the 
+#' `set_program()` function.
 #'
-#' @return a data frame of locations information for each study in the program trials
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}
+#' @return
+#' A data frame of locations information for each study in the program trials.
+#'
+#' @author
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#'
+#' @seealso
+#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}
+#'
 #' @examples
 #' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#'   # config your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
 #'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
+#'   # login using your account (interactive mode)
+#'   # you can pass your username and password as parameters (batch mode)
+#'   login_bms()
 #'
-#' set_crop("maize")
+#'   # Select a crop by name
+#'   set_crop("wheat")
 #'
-#' # select a breeding program by name
-#' set_program("MC Maize")
+#'   # select a breeding program by name
+#'   set_program("Wheat International Nurseries")
 #'
-#' # retrive all environments/locations information in the selected program studies/trials
-#' program_studies <- get_program_studies()
+#'   # retrieve all environments/locations information in the selected program studies/trials
+#'   program_studies <- get_program_studies()
 #' }
+#'
 #' @export
 
 get_program_studies <- function() {
-  if (qbms_globals$config$engine == "breedbase") {
-    stop("This function is not supported yet in BreedBase!")
+  if (qbms_globals$config$engine != "bms") {
+    stop("This function is not supported yet in this database!")
   }
 
   if (is.null(qbms_globals$state$program_db_id)) {
@@ -1330,12 +1791,18 @@ get_program_studies <- function() {
 #' Get Germplasm ID
 #'
 #' @description 
-#' Get the germplasm id for the given germplasm name in the current crop
+#' Retrieves the germplasm ID for the given germplasm name in the current crop.
 #'
-#' @param germplasm_name the name of the germplasm
-#' @return a string of the germplasm id
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{set_crop}}, \code{\link{get_germplasm_data}}, \code{\link{get_germplasm_attributes}}
+#' @param germplasm_name The name of the germplasm.
+#' 
+#' @return 
+#' A string of the germplasm ID.
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso 
+#' \code{\link{set_crop}}, \code{\link{get_germplasm_data}}, \code{\link{get_germplasm_attributes}}
 
 get_germplasm_id <- function(germplasm_name = "") {
   if (germplasm_name == "") {
@@ -1346,11 +1813,15 @@ get_germplasm_id <- function(germplasm_name = "") {
     stop("No crop has been selected yet! You have to set your crop first using the `set_crop()` function")
   }
   
-  crop_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop, "/brapi/v1")
-  call_url <- paste0(crop_url, "/germplasm?germplasmName=", germplasm_name)
-  
+  call_url <- paste0(qbms_globals$config$base_url,
+                     ifelse(qbms_globals$config$crop == "", "", paste0("/", qbms_globals$config$crop)),
+                     "/brapi/", qbms_globals$config$brapi_ver, "/",
+                     brapi_map[brapi_map$func_name == "get_germplasm_id" & brapi_map$brapi_ver == qbms_globals$config$brapi_ver, "brapi_call"])
+
+  call_url <- sub("\\{germplasmName\\}", germplasm_name, call_url)
+
   # this BrAPI call return all germplasm records start with the given name NOT exactly match!
-  results <- brapi_get_call(call_url)$data
+  results <- brapi_get_call(call_url, FALSE)$data
   
   if (length(results) == 0) {
     stop("No germplasm in this crop database start with your filtering name!")
@@ -1366,38 +1837,46 @@ get_germplasm_id <- function(germplasm_name = "") {
 }
 
 
-#' Get the observations data of a given germplasm name in a crop
+#' Retrieve Observations Data for a Specified Germplasm.
 #'
 #' @description
-#' This function will retrieve all the observations data available for a given germplasm
-#' in the current crop database regardless of the programs/trials nested structure.
+#' Retrieves all available observations data for a given germplasm in the current 
+#' crop database, regardless of the nested structure of programs/trials.
 #'
-#' @param germplasm_name the name of the germplasm
-#' @return a data frame of the germplasm observations data aggregate from all trials
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{get_germplasm_attributes}}
+#' @param germplasm_name The name of the germplasm.
+#' 
+#' @return 
+#' A data frame containing the aggregated observations data for the germplasm from all trials.
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso 
+#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{get_germplasm_attributes}}
+#' 
 #' @examples
-#' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
-#'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
-#'
-#' set_crop("maize")
-#'
-#' # select a breeding program by name
-#' set_program("MC Maize")
-#'
-#' # retrive observations data of a given germplasm aggregated from all trials
-#' germplasm_observations <- get_germplasm_data("BASFCORN-2-1")
+#' if (interactive()) {
+#'   # Configure server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
+#'   
+#'   # Log in using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
+#'   
+#'   # Select a crop
+#'   set_crop("wheat")
+#'   
+#'   # Select a breeding program by name
+#'   set_program("Wheat International Nurseries")
+#'   
+#'   # Retrieve observations data for a specified germplasm aggregated from all trials
+#'   germplasm_observations <- get_germplasm_data("Jabal")
 #' }
 #' @export
 
 get_germplasm_data <- function(germplasm_name = "") {
-  if (qbms_globals$config$engine == "breedbase") {
-    stop("This function is not supported yet in BreedBase!")
+  if (qbms_globals$config$engine != "bms") {
+    stop("This function is not supported yet in this database!")
   }
   
   germplasm_db_id <- get_germplasm_id(germplasm_name)
@@ -1461,40 +1940,50 @@ get_germplasm_data <- function(germplasm_name = "") {
 }
 
 
-#' Get germplasm attributes for a given germplasm in a crop
+#' Retrieve Attributes for a Specified Germplasm
 #'
-#' @param germplasm_name the name of the germplasm
-#' @return a data frame of the germplasm attributes
-#' @author Johan Steven Aparicio, \email{j.aparicio@cgiar.org}
-#' @seealso \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{get_germplasm_data}}
+#' @param germplasm_name The name of the germplasm.
+#' 
+#' @return 
+#' A data frame containing the attributes of the specified germplasm.
+#' 
+#' @author 
+#' Johan Steven Aparicio, \email{j.aparicio@cgiar.org}
+#' 
+#' @seealso 
+#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{get_germplasm_data}}
+#' 
 #' @examples
-#' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#' if (interactive()) {
+#'   # Configure your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
 #'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
+#'   # Log in using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
 #'
-#' set_crop("maize")
+#'   # Select a crop
+#'   set_crop("wheat")
 #'
-#' # select a breeding program by name
-#' set_program("MC Maize")
+#'   # Select a breeding program by name
+#'   set_program("Wheat International Nurseries")
 #'
-#' # retrive attributes data of a given germplasm in a crop
-#' germplasm_attributes <- get_germplasm_attributes("BASFCORN-2-1")
+#'   # Retrieve attribute data of a specified germplasm in a crop
+#'   germplasm_attributes <- get_germplasm_attributes("Jabal")
 #' }
 #' @export
 
 get_germplasm_attributes <- function(germplasm_name = "") {
-  if (qbms_globals$config$engine == "breedbase") {
-    stop("This function is not supported yet in BreedBase!")
-  }
-  
   germplasm_db_id <- get_germplasm_id(germplasm_name)
   
-  crop_url <- paste0(qbms_globals$config$base_url, "/", qbms_globals$config$crop)
-  call_url <- paste0(crop_url, "/brapi/v1/germplasm/", germplasm_db_id, "/attributes")
+  if (length(germplasm_db_id) > 1) { germplasm_db_id <- germplasm_db_id[1] }
+  
+  call_url <- paste0(qbms_globals$config$base_url, 
+                     ifelse(qbms_globals$config$crop == "", "", paste0("/", qbms_globals$config$crop)), 
+                     "/brapi/", qbms_globals$config$brapi_ver, "/", 
+                     brapi_map[brapi_map$func_name == "get_germplasm_attributes" & brapi_map$brapi_ver == qbms_globals$config$brapi_ver, "brapi_call"])
+  
+  call_url <- sub("\\{germplasmDbId\\}", germplasm_db_id, call_url)
   
   results <- brapi_get_call(call_url)$data
 
@@ -1507,12 +1996,16 @@ get_germplasm_attributes <- function(germplasm_name = "") {
 #' Get Direct Parents
 #'
 #' @description
-#' Internal helping function to split the given pedigree string that provides the parentage
-#' through which a cultivar was obtained, and get the pedigrees of the direct parents.
+#' Internal helper function to split the given pedigree string that provides the parentage
+#' through which a cultivar was obtained and retrieve the pedigrees of the direct parents.
 #'
-#' @param pedigree String provide the parentage through which a cultivar was obtained.
-#' @return Vector of two items, the direct female and male parents.
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @param pedigree A string providing the parentage through which a cultivar was obtained.
+#' 
+#' @return 
+#' A vector of two items, representing the direct female and male parents.
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
 
 get_parents <- function(pedigree) {
   # make sure it is a string
@@ -1560,14 +2053,18 @@ get_parents <- function(pedigree) {
 #' Building Pedigree Table Recursively
 #'
 #' @description
-#' Internal helping function to build the pedigree table recursively.
+#' Internal helper function to build the pedigree table recursively.
 #'
-#' @param geno_list List of genotypes/germplasms names.
-#' @param pedigree_list List of associated pedigree strings.
-#' @param pedigree_df Pedigree data.frame as per previous call/iteration.
-#' @return A data.frame that has three columns correspond to the identifiers for the individual,
-#'         female parent and male parent, respectively.
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @param geno_list A list of genotypes/germplasm names.
+#' @param pedigree_list A list of associated pedigree strings.
+#' @param pedigree_df Pedigree data.frame as per the previous call/iteration.
+#' 
+#' @return 
+#' A data.frame with three columns corresponding to the identifiers for the 
+#' individual, female parent, and male parent, respectively.
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
 
 build_pedigree_table <- function(geno_list = NULL, pedigree_list = NULL, pedigree_df = NULL) {
   # check if geno list is not empty
@@ -1647,66 +2144,72 @@ build_pedigree_table <- function(geno_list = NULL, pedigree_list = NULL, pedigre
 #' Get the Pedigree Table
 #'
 #' @description
-#' Get the pedigree table starting from current germplasm list and associated
+#' Retrieve the pedigree table starting from the current germplasm list and associated
 #' pedigree string that provides the parentage through which a cultivar was obtained.
 #'
-#' @param data germplasm dataset as a data.frame.
-#' @param geno_column name of the column that identifies the genotype/germplasm names.
-#' @param pedigree_column name of the column that identifies the pedigree strings.
-#' @return A data.frame that has three columns correspond to the identifiers for the individual,
-#'         female parent and male parent, respectively. The row giving the pedigree of an
-#'         individual appears before any row where that individual appears as a parent.
-#'         Founders use NA in the parental columns.
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @param data Germplasm dataset as a data.frame.
+#' @param geno_column Name of the column that identifies the genotype/germplasm names.
+#' @param pedigree_column Name of the column that identifies the pedigree strings.
+#' 
+#' @return 
+#' A data.frame with three columns corresponding to the identifiers for the individual,
+#' female parent, and male parent, respectively. The row giving the pedigree of an
+#' individual appears before any row where that individual appears as a parent.
+#' Founders use NA in the parental columns.
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
 #' @examples
-#' if(interactive()) {
-#' # config your BMS connection
-#' set_qbms_config("https://www.bms-uat-test.net/ibpworkbench")
+#' if (interactive()) {
+#'   # Configure your server connection
+#'   set_qbms_config("https://bms.icarda.org/ibpworkbench")
 #'
-#' # login using your BMS account (interactive mode)
-#' # you can pass BMS username and password as parameters (batch mode)
-#' login_bms()
+#'   # Login using your account (interactive mode)
+#'   # You can pass your username and password as parameters (batch mode)
+#'   login_bms()
 #'
-#' set_crop("maize")
+#'   # Select a crop by name
+#'   set_crop("wheat")
 #'
-#' # select a breeding program by name
-#' set_program("MC Maize")
+#'   # Select a breeding program by name
+#'   set_program("Wheat International Nurseries")
 #'
-#' # select a specific study/trial by name
-#' set_trial("2018 PVT")
+#'   # Select a specific study/trial by name
+#'   set_trial("IDYT39")
 #'
-#' # select a specific environment/location dataset
-#' set_study("2018 PVT Environment Number 1")
+#'   # Select a specific environment/location dataset
+#'   set_study("IDYT39 Environment Number 9")
 #'
-#' # retrieve the germplasm list of the selected environment/location
-#' germplasm <- get_germplasm_list()
+#'   # Retrieve the germplasm list of the selected environment/location
+#'   germplasm <- get_germplasm_list()
 #'
-#' pedigree_table <- get_pedigree_table(germplasm, "germplasmName", "pedigree")
+#'   pedigree_table <- get_pedigree_table(germplasm, "germplasmName", "pedigree")
 #'
-#' #############################
-#' # nadiv package way
-#' # library(nadiv)
+#'   #############################
+#'   # nadiv package way
+#'   # library(nadiv)
 #'
-#' # get additive relationship matrix in sparse matrix format
-#' # A <- nadiv::makeA(pedigree_table)
+#'   # Get additive relationship matrix in sparse matrix format
+#'   # A <- nadiv::makeA(pedigree_table)
 #'
-#' # get A inverse matrix using base R function
-#' # AINV <- solve(as.matrix(A))
+#'   # Get A inverse matrix using base R function
+#'   # AINV <- solve(as.matrix(A))
 #'
-#' #############################
-#' # ASReml-R package way
-#' # library(asreml)
+#'   #############################
+#'   # ASReml-R package way
+#'   # library(asreml)
 #'
-#' # represent A inverse matrix in efficient way using i,j index and Ainverse value
-#' # actual genotype names of any given index are in the attr(ainv, "rowNames")
-#' # ainv <- asreml::ainverse(pedigree_table)
+#'   # Represent A inverse matrix in an efficient way using i, j index and Ainverse value
+#'   # Actual genotype names of any given index are in the attr(ainv, "rowNames")
+#'   # ainv <- asreml::ainverse(pedigree_table)
 #'
-#' #############################
-#' # dummy data set for testing
-#' test <- data.frame(genotype = c("X", "Y"),
-#'                    pedigree = c("A//B/D/2/C", "B/C/3/A//B/C/2/D"))
+#'   #############################
+#'   # Dummy data set for testing
+#'   test <- data.frame(genotype = c("X", "Y"),
+#'                      pedigree = c("A//B/D/2/C", "B/C/3/A//B/C/2/D"))
 #'
-#' pedigree_table <- get_pedigree_table(test, "genotype", "pedigree")
+#'   pedigree_table <- get_pedigree_table(test, "genotype", "pedigree")
 #' }
 #' @export
 
@@ -1763,34 +2266,40 @@ get_pedigree_table <- function(data, geno_column = "germplasmName", pedigree_col
 }
 
 
-## GIGWA ##################################################################################
+## GIGWA #######################################################################
 
-#' Login to the GIGWA server
+#' Login to the GIGWA Server
 #'
 #' @description
-#' Connect to the GIGWA server. If username or password parameters are missing,
-#' then a login window will pop-up to insert username and password.
+#' Connect to the GIGWA server. If the username or password parameters are missing,
+#' a login window will pop up to insert the username and password.
 #'
-#' All other connection parameters (i.e. server IP or domain, connection port,
-#' API path, and connection protocol e.g. http://) will retrieve from the
-#' qbms_config list.
+#' All other connection parameters (i.e., server IP or domain, connection port,
+#' API path, and connection protocol e.g., http://) will be retrieved from the
+#' `qbms_config` list.
 #'
-#' This function will update both of the qbms_config list (brapi connection
+#' This function will update both the qbms_config list (brapi connection
 #' object in the con key) and qbms_state list (token value in the token key).
 #'
-#' @param username the GIGWA username (optional, default is NULL)
-#' @param password the GIGWA password (optional, default is NULL)
-#' @return no return value
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @param username The GIGWA username (optional, default is NULL).
+#' @param password The GIGWA password (optional, default is NULL).
+#' 
+#' @return 
+#' No return value.
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
 #' @examples
-#' if(interactive()) {
-#' # config your GIGWA connection
-#' set_qbms_config("http://localhost:59395/gigwa/index.jsp", time_out = 300, engine = "gigwa")
+#' if (interactive()) {
+#'   # Configure your GIGWA connection
+#'   set_qbms_config("http://localhost:59395/gigwa/index.jsp", time_out = 300, engine = "gigwa")
 #'
-#' # login using your GIGWA account (interactive mode)
-#' # you can pass GIGWA username and password as parameters (batch mode)
-#' login_gigwa()
-#' login_gigwa("gigwadmin", "nimda")
+#'   # Login using your GIGWA account (interactive mode)
+#'   login_gigwa()
+#'   
+#'   # You can pass GIGWA username and password as parameters (batch mode)
+#'   # login_gigwa("gigwadmin", "nimda")
 #' }
 #' @export
 
@@ -1811,23 +2320,32 @@ login_gigwa <- function(username = NULL, password = NULL) {
     stop("403 Forbidden")
   }
   
-  qbms_globals$state$token <- httr::content(response)$token
+  set_token(httr::content(response)$token)
 }
 
 
-#' Get the list of existing databases in the current GIGWA server
+#' List GIGWA Databases
+#' 
+#' @description
+#' Get the list of existing databases in the current GIGWA server.
 #'
-#' @return a list of existing databases
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{set_qbms_config}}
+#' @return 
+#' A list of existing databases.
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso 
+#' \code{\link{set_qbms_config}}
+#' 
 #' @examples
-#' if(interactive()) {
-#' # config your GIGWA connection
-#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
-#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
+#' if (interactive()) {
+#'   # Configure your GIGWA connection
+#'   set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                   time_out = 300, engine = "gigwa", no_auth = TRUE)
 #'
-#' # list existing databases in the GIGWA server
-#' gigwa_list_dbs()
+#'   # List existing databases in the GIGWA server
+#'   gigwa_list_dbs()
 #' }
 #' @export
 
@@ -1844,24 +2362,31 @@ gigwa_list_dbs <- function() {
 }
 
 
-#' Set the current active GIGWA database by name
+#' Set the Current Active GIGWA Database by Name
 #'
 #' @description
-#' This function will update the current active database in the internal
+#' This function updates the current active database in the internal
 #' configuration object (including the brapi connection object).
 #'
-#' @param db_name the name of the database
-#' @return no return value
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{set_qbms_config}}, \code{\link{gigwa_list_dbs}}
+#' @param db_name The name of the database.
+#' 
+#' @return 
+#' No return value.
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso 
+#' \code{\link{set_qbms_config}}, \code{\link{gigwa_list_dbs}}
+#' 
 #' @examples
-#' if(interactive()) {
-#' # config your GIGWA connection
-#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
-#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
+#' if (interactive()) {
+#'   # Configure your GIGWA connection
+#'   set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                   time_out = 300, engine = "gigwa", no_auth = TRUE)
 #'
-#' # select a database by name
-#' gigwa_set_db("Sorghum-JGI_v1")
+#'   # Select a database by name
+#'   gigwa_set_db("Sorghum-JGI_v1")
 #' }
 #' @export
 
@@ -1878,27 +2403,32 @@ gigwa_set_db <- function(db_name) {
 }
 
 
-#' Get the list of all projects in the selected GIGWA database
+#' Get the List of All Projects in the Selected GIGWA Database
 #'
 #' @description
-#' This function will retrieve the projects list from the current active
-#' database as configured in the internal configuration object using `gigwa_set_db()`
-#' function.
+#' Retrieves the projects list from the currently active database as configured 
+#' in the internal configuration object using the `gigwa_set_db()` function.
 #'
-#' @return a list of projects names
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{set_qbms_config}}, \code{\link{gigwa_set_db}}
+#' @return 
+#' A list of project names.
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso 
+#' \code{\link{set_qbms_config}}, \code{\link{gigwa_set_db}}
+#' 
 #' @examples
-#' if(interactive()) {
-#' # config your GIGWA connection
-#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
-#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
+#' if (interactive()) {
+#'   # Configure your GIGWA connection
+#'   set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                   time_out = 300, engine = "gigwa", no_auth = TRUE)
 #'
-#' # select a database by name
-#' gigwa_set_db("Sorghum-JGI_v1")
+#'   # Select a database by name
+#'   gigwa_set_db("Sorghum-JGI_v1")
 #'
-#' # list existing projects
-#' gigwa_list_projects()
+#'   # List existing projects
+#'   gigwa_list_projects()
 #' }
 #' @export
 
@@ -1918,37 +2448,44 @@ gigwa_list_projects <- function() {
     
     gigwa_projects <- brapi_get_call(call_url)$data
     
-    gigwa_projects <- gigwa_projects[c("studyName")]
+    gigwa_projects <- gigwa_projects[, c("studyName", "studyDbId")]
     
     qbms_globals$state$gigwa_projects <- gigwa_projects
   }
 
-  return(gigwa_projects)
+  return(gigwa_projects[c("studyName")])
 }
 
 
-#' Set the current active GIGWA project
+#' Set the Current Active GIGWA Project
 #'
 #' @description
-#' This function will update the current active project in the internal state object 
-#' using the programDbId retrieved from GIGWA which is associated to the given 
+#' This function updates the current active project in the internal state object 
+#' using the programDbId retrieved from GIGWA which is associated with the given 
 #' `project_name` parameter.
 #'
-#' @param project_name the name of the project
-#' @return no return value
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{set_qbms_config}}, \code{\link{gigwa_set_db}}, \code{\link{gigwa_list_projects}}
+#' @param project_name The name of the project.
+#' 
+#' @return 
+#' No return value.
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso 
+#' \code{\link{set_qbms_config}}, \code{\link{gigwa_set_db}}, \code{\link{gigwa_list_projects}}
+#' 
 #' @examples
-#' if(interactive()) {
-#' # config your GIGWA connection
-#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
-#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
+#' if (interactive()) {
+#'   # Configure your GIGWA connection
+#'   set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                   time_out = 300, engine = "gigwa", no_auth = TRUE)
 #'
-#' # select a database by name
-#' gigwa_set_db("Sorghum-JGI_v1")
+#'   # Select a database by name
+#'   gigwa_set_db("Sorghum-JGI_v1")
 #'
-#' # select a project by name
-#' gigwa_set_project("Nelson_et_al_2011")
+#'   # Select a project by name
+#'   gigwa_set_project("Nelson_et_al_2011")
 #' }
 #' @export
 
@@ -1959,9 +2496,7 @@ gigwa_set_project <- function(project_name) {
     stop("Your project name is not exists in this database! You may use the `gigwa_list_projects()` function to check the available projects")
   }
   
-  call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/studies?programDbId=", qbms_globals$config$db)
-  
-  gigwa_projects <- brapi_get_call(call_url)$data
+  gigwa_projects <- qbms_globals$state$gigwa_projects
 
   project_row <- which(gigwa_projects$studyName == project_name)
   
@@ -1971,29 +2506,35 @@ gigwa_set_project <- function(project_name) {
 }
 
 
-#' Get the list of run names in the selected GIGWA project
+#' Get the List of the Run Names Available in the Selected GIGWA Project
 #'
 #' @description
-#' This function will retrieve the runs list from the current active project as configured 
-#' in the internal configuration object using `gigwa_set_project()` function.
+#' This function retrieves the runs list from the currently active project as configured 
+#' in the internal configuration object using the `gigwa_set_project()` function.
 #'
-#' @return a list of runs names
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{set_qbms_config}}, \code{\link{gigwa_set_project}}
-#' @examples
-#' if(interactive()) {
-#' # config your GIGWA connection
-#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
-#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
-#'
-#' # select a database by name
-#' gigwa_set_db("Sorghum-JGI_v1")
-#'
-#' # select a project by name
-#' gigwa_set_project("Nelson_et_al_2011")
+#' @return 
+#' A list of run names.
 #' 
-#' # list all runs in the selected project
-#' gigwa_list_runs()
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso 
+#' \code{\link{set_qbms_config}}, \code{\link{gigwa_set_project}}
+#' 
+#' @examples
+#' if (interactive()) {
+#'   # Configure your GIGWA connection
+#'   set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                   time_out = 300, engine = "gigwa", no_auth = TRUE)
+#'
+#'   # Select a database by name
+#'   gigwa_set_db("Sorghum-JGI_v1")
+#'
+#'   # Select a project by name
+#'   gigwa_set_project("Nelson_et_al_2011")
+#'   
+#'   # List all runs in the selected project
+#'   gigwa_list_runs()
 #' }
 #' @export
 
@@ -2017,41 +2558,48 @@ gigwa_list_runs <- function() {
     
     results <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = TRUE)
     
-    gigwa_runs <- as.data.frame(results$result$data$variantSetName)
+    gigwa_runs <- as.data.frame(results$result$data[, c("variantSetName", "variantSetDbId")])
     
-    colnames(gigwa_runs) <- c("variantSetName")
+    #colnames(gigwa_runs) <- c("variantSetName")
     
     qbms_globals$state$gigwa_runs <- gigwa_runs
   }
   
-  return(gigwa_runs)
+  return(gigwa_runs[c("variantSetName")])
 }
 
 
-#' Set the current active GIGWA run
+#' Set the Current Active GIGWA Run
 #'
 #' @description
-#' This function will update the current active run in the internal state object using the 
-#' `studyDbIds` retrieved from GIGWA which is associated to the given run_name parameter.
+#' This function updates the current active run in the internal state object using the 
+#' `studyDbIds` retrieved from GIGWA, which are associated with the given `run_name` parameter.
 #'
-#' @param run_name the name of the run
-#' @return no return value
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{set_qbms_config}}, \code{\link{gigwa_set_project}}, \code{\link{gigwa_list_runs}}
-#' @examples
-#' if(interactive()) {
-#' # config your GIGWA connection
-#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
-#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
-#'
-#' # select a database by name
-#' gigwa_set_db("Sorghum-JGI_v1")
-#'
-#' # select a project by name
-#' gigwa_set_project("Nelson_et_al_2011")
+#' @param run_name The name of the run.
 #' 
-#' # select a specific run by name
-#' gigwa_set_run("run1")
+#' @return 
+#' No return value.
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso 
+#' \code{\link{set_qbms_config}}, \code{\link{gigwa_set_project}}, \code{\link{gigwa_list_runs}}
+#' 
+#' @examples
+#' if (interactive()) {
+#'   # Configure your GIGWA connection
+#'   set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                   time_out = 300, engine = "gigwa", no_auth = TRUE)
+#'
+#'   # Select a database by name
+#'   gigwa_set_db("Sorghum-JGI_v1")
+#'
+#'   # Select a project by name
+#'   gigwa_set_project("Nelson_et_al_2011")
+#'   
+#'   # Select a specific run by name
+#'   gigwa_set_run("run1")
 #' }
 #' @export
 
@@ -2061,20 +2609,8 @@ gigwa_set_run <- function(run_name) {
   if (!run_name %in% unlist(valid_runs)) {
     stop("Your run name is not exists in this project! You may use the `gigwa_list_runs()` function to check the available runs")
   }
-  
-  call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/search/variantsets")
-  
-  auth_code <- paste0("Bearer ", qbms_globals$state$token)
-  headers   <- c("Authorization" = auth_code, "Accept-Encoding" = "gzip, deflate")
-  call_body <- paste0('{"studyDbIds": ["', qbms_globals$state$study_db_id, '"]}')
-  
-  response <- httr::POST(url = utils::URLencode(call_url), body = call_body, 
-                         encode = "raw", httr::accept_json(), httr::content_type_json(), 
-                         httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
-  
-  results <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = TRUE)
-  
-  gigwa_runs <- as.data.frame(results$result$data)
+
+  gigwa_runs <- qbms_globals$state$gigwa_runs
   
   qbms_globals$state$variant_set_db_id <- gigwa_runs[gigwa_runs$variantSetName == run_name, "variantSetDbId"]
   
@@ -2082,32 +2618,38 @@ gigwa_set_run <- function(run_name) {
 }
 
 
-#' Get the samples list of the current active GIGWA run
+#' Get the Samples List of the Current Active GIGWA Run
 #'
 #' @description
-#' This function will retrieve the samples list of the current active run
-#' as configured in the internal state object using `gigwa_set_run()` function.
+#' This function retrieves the samples list of the current active run
+#' as configured in the internal state object using the `gigwa_set_run()` function.
 #'
-#' @return a vector of all samples in the selected run
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{set_qbms_config}}, \code{\link{gigwa_set_run}}
+#' @return 
+#' A vector of all samples in the selected run.
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso 
+#' \code{\link{set_qbms_config}}, \code{\link{gigwa_set_run}}
+#' 
 #' @examples
-#' if(interactive()) {
-#' # config your GIGWA connection
-#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
-#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
+#' if (interactive()) {
+#'   # Configure your GIGWA connection
+#'   set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                   time_out = 300, engine = "gigwa", no_auth = TRUE)
 #'
-#' # select a database by name
-#' gigwa_set_db("Sorghum-JGI_v1")
+#'   # Select a database by name
+#'   gigwa_set_db("Sorghum-JGI_v1")
 #'
-#' # select a project by name
-#' gigwa_set_project("Nelson_et_al_2011")
-#' 
-#' # select a specific run by name
-#' gigwa_set_run("run1")
-#' 
-#' # get a list of all samples in the selected run
-#' samples <- gigwa_get_samples()
+#'   # Select a project by name
+#'   gigwa_set_project("Nelson_et_al_2011")
+#'   
+#'   # Select a specific run by name
+#'   gigwa_set_run("run1")
+#'   
+#'   # Get a list of all samples in the selected run
+#'   samples <- gigwa_get_samples()
 #' }
 #' @export
 
@@ -2131,51 +2673,59 @@ gigwa_get_samples <- function() {
     
     results <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = TRUE)
     
-    gigwa_samples <- results$result$data$germplasmName
+    gigwa_samples <- results$result$data[, c("germplasmName", "germplasmDbId")]
     
     qbms_globals$state$gigwa_samples <- gigwa_samples
   }
 
-  return(gigwa_samples)
+  return(gigwa_samples$germplasmName)
 }
 
 
-#' Get variants in the selected GIGWA run
+#' Get Available Variants in the Selected GIGWA Run
 #'
 #' @description
 #' Query the variants (e.g., SNPs markers) in the selected GIGWA run that match a given criteria.
 #' 
-#' @param max_missing maximum missing ratio (by sample) between 0 and 1 (default is 1 for 100\%).
-#' @param min_maf minimum Minor Allele Frequency (MAF) between 0 and 1 (default is 0 for 0\%).
-#' @param samples a list of a samples subset (default is NULL will retrieve for all samples).
-#' @return A data.frame that has the first 4 columns describe attributes of the SNP 
-#'         (rs#: variant name, alleles: reference allele / alternative allele, chrom: chromosome name, 
-#'         and pos: position in bp), while the following columns describe the SNP value for a 
-#'         single sample line using numerical coding 0, 1, and 2 for reference, heterozygous, and 
-#'         alternative/minor alleles.
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' @param max_missing Maximum missing ratio (by sample) between 0 and 1 (default is 1 for 100\%).
+#' @param min_maf Minimum Minor Allele Frequency (MAF) between 0 and 1 (default is 0 for 0\%).
+#' @param samples A list of samples subset (default is NULL, which will retrieve for all samples).
+#' @param start Start position of region (zero-based, inclusive) (e.g., 19750802).
+#' @param end End position of region (zero-based, exclusive)	(e.g., 19850125).
+#' @param referenceName Reference sequence name	(e.g., '6H' in the Barley LI-AM).
+#' 
+#' @return 
+#' A data.frame that has the first 4 columns describing attributes of the SNP 
+#' (rs#: variant name, alleles: reference allele / alternative allele, chrom: chromosome name, 
+#' and pos: position in bp), while the following columns describe the SNP value for a 
+#' single sample line using numerical coding 0, 1, and 2 for reference, heterozygous, and 
+#' alternative/minor alleles.
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
 #' @examples
-#' if(interactive()) {
-#' # config your GIGWA connection
-#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
-#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
+#' if (interactive()) {
+#'   # Configure your GIGWA connection
+#'   set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                   time_out = 300, engine = "gigwa", no_auth = TRUE)
 #'
-#' # select a database by name
-#' gigwa_set_db("Sorghum-JGI_v1")
+#'   # Select a database by name
+#'   gigwa_set_db("Sorghum-JGI_v1")
 #'
-#' # select a project by name
-#' gigwa_set_project("Nelson_et_al_2011")
-#' 
-#' # select a specific run by name
-#' gigwa_set_run("run1")
-#' 
-#' marker_matrix <- gigwa_get_variants(max_missing = 0.2, 
-#'                                     min_maf = 0.35, 
-#'                                     samples = c("ind1", "ind3", "ind7"))
+#'   # Select a project by name
+#'   gigwa_set_project("Nelson_et_al_2011")
+#'   
+#'   # Select a specific run by name
+#'   gigwa_set_run("run1")
+#'   
+#'   marker_matrix <- gigwa_get_variants(max_missing = 0.2, 
+#'                                       min_maf = 0.35, 
+#'                                       samples = c("ind1", "ind3", "ind7"))
 #' }
 #' @export
 
-gigwa_get_variants <- function(max_missing = 1, min_maf = 0, samples = NULL) {
+gigwa_get_variants <- function(max_missing = 1, min_maf = 0, samples = NULL, start = NULL, end = NULL, referenceName = NULL) {
   if (is.null(qbms_globals$state$study_db_id)) {
     stop("No project has been selected yet! You have to set your project first using the `gigwa_set_project()` function")
   }
@@ -2198,11 +2748,19 @@ gigwa_get_variants <- function(max_missing = 1, min_maf = 0, samples = NULL) {
   } else {
     samples <- gigwa_get_samples()
   }
-
+  
+  if (!is.null(start) && !is.numeric(start)){
+    stop("Start position should be numeric!")
+  }
+  
+  if (!is.null(end) && !is.numeric(end)){
+    stop("End position should be numeric!")
+  }
+  
   # https://gigwa-dev.southgreen.fr/gigwaV2/rest/swagger-ui/index.html?urls.primaryName=GA4GH%20API%20v0.6.0a5#/ga-4gh-rest-controller/searchVariantsUsingPOST
-  # https://ga4gh-schemas.readthedocs.io/en/latest/schemas/variants.proto.html
-  # https://app.swaggerhub.com/apis-docs/PlantBreedingAPI/BrAPI-New-Concept-Preview/0.0.0-proposal#/Genotype-Matrix-Redesign/post_search_variantmatrix
-  # https://github.com/plantbreeding/BrAPI/issues/546
+  # https://rest.ensembl.org/documentation/info/gavariants
+  # https://app.swaggerhub.com/apis/PlantBreedingAPI/BrAPI-Genotyping/2.1#/Allele%20Matrix/post_search_allelematrix
+  # https://brapigenotyping21.docs.apiary.io/#/reference/allele-matrix
   
   call_url <- paste0(qbms_globals$config$base_url, "/ga4gh/variants/search")
   
@@ -2216,6 +2774,10 @@ gigwa_get_variants <- function(max_missing = 1, min_maf = 0, samples = NULL) {
                     minmaf = min_maf * 100,
                     maxmaf = 50,
                     missingData = max_missing * 100)
+  
+  if (!is.null(referenceName)) call_body$referenceName <- referenceName
+  if (!is.null(start)) call_body$start <- start
+  if (!is.null(end)) call_body$end <- end
   
   response <- httr::POST(url = utils::URLencode(call_url), body = call_body, encode = "json", 
                          httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
@@ -2242,7 +2804,11 @@ gigwa_get_variants <- function(max_missing = 1, min_maf = 0, samples = NULL) {
                     getGT = TRUE,
                     pageSize = qbms_globals$config$page_size,
                     pageToken = "0")
-
+  
+  if (!is.null(referenceName)) call_body$referenceName <- referenceName
+  if (!is.null(start)) call_body$start <- start
+  if (!is.null(end)) call_body$end <- end
+  
   g_matrix <- data.frame(matrix(ncol = length(samples) + 4, nrow = 0))
 
   repeat {
@@ -2299,32 +2865,38 @@ gigwa_get_variants <- function(max_missing = 1, min_maf = 0, samples = NULL) {
 }
 
 
-#' Get the metadate of the current active GIGWA run
+#' Get the Metadata of the Current Active GIGWA Run
 #'
 #' @description
-#' This function will retrieve the metadata of the current active run
-#' as configured in the internal state object using `gigwa_set_run()` function.
+#' This function retrieves the metadata of the current active run
+#' as configured in the internal state object using the `gigwa_set_run()` function.
 #'
-#' @return a data.frame of all metadata associated to the samples in the selected run
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' @seealso \code{\link{set_qbms_config}}, \code{\link{gigwa_set_run}}
+#' @return 
+#' A data.frame of all metadata associated with the samples in the selected run.
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso 
+#' \code{\link{set_qbms_config}}, \code{\link{gigwa_set_run}}
+#' 
 #' @examples
-#' if(interactive()) {
-#' # config your GIGWA connection
-#' set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
-#'                 time_out = 300, engine = "gigwa", no_auth = TRUE)
+#' if (interactive()) {
+#'   # Configure your GIGWA connection
+#'   set_qbms_config("https://gigwa.southgreen.fr/gigwa/", 
+#'                   time_out = 300, engine = "gigwa", no_auth = TRUE)
 #'
-#' # select a database by name
-#' gigwa_set_db("3kG_10M")
+#'   # Select a database by name
+#'   gigwa_set_db("3kG_10M")
 #'
-#' # select a project by name
-#' gigwa_set_project("3003_ind")
-#' 
-#' # select a specific run by name
-#' gigwa_set_run("1")
-#' 
-#' # get a list of all samples in the selected run
-#' metadata <- gigwa_get_metadata()
+#'   # Select a project by name
+#'   gigwa_set_project("3003_ind")
+#'   
+#'   # Select a specific run by name
+#'   gigwa_set_run("1")
+#'   
+#'   # Get a list of all samples in the selected run
+#'   metadata <- gigwa_get_metadata()
 #' }
 #' @export
 
@@ -2333,21 +2905,13 @@ gigwa_get_metadata <- function() {
     stop("No project has been selected yet! You have to set your project first using the `gigwa_set_project()` function")
   }
   
-  call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/search/germplasm")
-  
+  gigwa_get_samples()
+  germplasmDbIds <- paste(qbms_globals$state$gigwa_samples$germplasmDbId, collapse = '","')
+
   auth_code <- paste0("Bearer ", qbms_globals$state$token)
   headers   <- c("Authorization" = auth_code, "Accept-Encoding" = "gzip, deflate")
-  call_body <- paste0('{"studyDbIds": ["', qbms_globals$state$study_db_id, '"]}')
-  
-  response <- httr::POST(url = utils::URLencode(call_url), body = call_body, 
-                         encode = "raw", httr::accept_json(), httr::content_type_json(), 
-                         httr::add_headers(headers), httr::timeout(qbms_globals$config$time_out))
-  
-  results <- jsonlite::fromJSON(httr::content(response, as = "text", encoding = "UTF-8"), flatten = TRUE)
   
   call_url <- paste0(qbms_globals$config$base_url, "/brapi/v2/search/attributevalues")
-  
-  germplasmDbIds <- paste(results$result$data$germplasmDbId, collapse = '","')
   call_body <- paste0('{"germplasmDbIds": ["', germplasmDbIds, '"]}')
   
   response <- httr::POST(url = utils::URLencode(call_url), body = call_body, 
@@ -2363,9 +2927,9 @@ gigwa_get_metadata <- function() {
 }
 
 
-## TerraClimate ###########################################################################
+## TerraClimate ################################################################
 
-#' Get TerraClimate data for a given coordinate(s)
+#' Get TerraClimate Data for a Given Coordinate(s)
 #'
 #' @description
 #' \href{https://www.climatologylab.org/terraclimate.html}{TerraClimate} is a monthly climate dataset 
@@ -2395,30 +2959,40 @@ gigwa_get_metadata <- function() {
 #' @param lon  Vector of Longitude(s) in decimal degree format.
 #' @param from Start date as a string in the 'YYYY-MM-DD' format.
 #' @param to   End date as a string in the 'YYYY-MM-DD' format.
-#' @param clim_vars List of all climate variables to be imported. Valid list includes: \emph{aet, def, pet,
-#'                  ppt, q, soil, srad, swe, tmax, tmin, vap, ws, vpd, and PDSI}. Default is NULL for all.
+#' @param clim_vars  List of all climate variables to be imported. Valid list includes: \emph{aet, def, pet,
+#'                   ppt, q, soil, srad, swe, tmax, tmin, vap, ws, vpd, and PDSI}. Default is NULL for all.
 #' @param month_mask A list of all months of interest (e.g., planting season: \code{c(10:12,1:5)}). 
 #'                   Default is NULL for all.
-#' @return A list of two data.frame(s) for each pair of coordinates:
+#' @param offline    Extract TerraClimate data from downloaded netCDF files (default is FALSE)
+#' @param data_path  String contains the directory path where downloaded netCDF files exists (default is './data/')
+#' 
+#' @return 
+#' A list of two data.frame(s) for each pair of coordinates:
 #' \itemize{
 #' \item \strong{climate:} includes the climate variables (\href{https://www.climatologylab.org/terraclimate-variables.html}{reference}).
 #' \item \strong{biovars:} includes the calculated bioclimatic variables (\href{https://www.worldclim.org/data/bioclim.html}{reference}).
 #' }
-#' @author Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso 
+#' \code{\link{ini_terraclimate}}
+#' 
 #' @examples
-#' if(interactive()) {
-#' # data <- get_terraclimate(36.016, 36.943, 
-#' #                          '1979-09-01', '2012-06-30', 
-#' #                          c('ppt', 'tmin', 'tmax'), c(10:12,1:5))
-#' data <- get_terraclimate(36.016, 36.943, '1979-09-01', '2012-06-30')
+#' if (interactive()) {
+#'   # data <- get_terraclimate(36.016, 36.943, 
+#'   #                          '1979-09-01', '2012-06-30', 
+#'   #                          c('ppt', 'tmin', 'tmax'), c(10:12,1:5))
+#'   data <- get_terraclimate(36.016, 36.943, '1979-09-01', '2012-06-30')
 #' 
-#' View(data$climate[[1]])
+#'   View(data$climate[[1]])
 #' 
-#' View(data$biovars[[1]])
+#'   View(data$biovars[[1]])
 #' }
 #' @export
 
-get_terraclimate <- function(lat, lon, from = '1958-01-01', to = '2020-12-31', clim_vars = NULL, month_mask = NULL){
+get_terraclimate <- function(lat, lon, from = '1958-01-01', to = '2022-12-31', clim_vars = NULL, month_mask = NULL, offline = FALSE, data_path = './data/'){
   # check if the given lat coordinate values are valid
   lat <- as.numeric(lat)
   if (!all(lat >= -90 & lat <= 90)) {
@@ -2441,20 +3015,22 @@ get_terraclimate <- function(lat, lon, from = '1958-01-01', to = '2020-12-31', c
   start_date <- as.Date(from)
   final_date <- as.Date(to)   
   
+  terraclimate_vars <- c('aet', 'def', 'pet', 'ppt', 'q', 'soil', 'srad', 'swe', 'tmax', 'tmin', 'vap', 'ws', 'vpd', 'PDSI')
+  
   if (is.null(clim_vars)) {
-    clim_vars <- c('aet', 'def', 'pet', 'ppt', 'q', 'soil', 'srad', 'swe', 'tmax', 'tmin', 'vap', 'ws', 'vpd', 'PDSI')
+    clim_vars <- terraclimate_vars
   } else {
-    # check if the given list of vars are supported/existed in TerraClimate vars
+    if (!all(clim_vars %in% terraclimate_vars)) stop("The given list of climatic variables is supported/existed in TerraClimate dataset!")
   }
   
   if (is.null(month_mask)) {
     if (is.null(month_mask)) month_mask <- 1:12
   } else {
-    # check if the given month_mask values are valid
+    if (!all(month_mask %in% 1:12)) stop("The given month_mask values are valid!")
   }
   
-  #clim_data <- NULL
   clim_data <- list()
+  biovars   <- list()
   
   start_month <- as.numeric(format(start_date, '%m'))
   start_year  <- as.numeric(format(start_date, '%Y'))
@@ -2464,68 +3040,121 @@ get_terraclimate <- function(lat, lon, from = '1958-01-01', to = '2020-12-31', c
   final_year  <- as.numeric(format(final_date, '%Y'))
   final_row   <- (final_year - 1958) * 12 + final_month
   
-  # setup the progress bar
-  pb <- utils::txtProgressBar(min = 0, max = loc_num * length(clim_vars), initial = 0, style = 3) 
-  pb_step <- round(loc_num * length(clim_vars) / 100)
-  
-  for (var in clim_vars) {
-    aggregate_url <- paste0('http://thredds.northwestknowledge.net:8080/thredds/dodsC/agg_terraclimate_', var, '_1958_CurrentYear_GLOBE.nc')
-    nc_metadata   <- RNetCDF::open.nc(aggregate_url)
+  if (offline == TRUE) {
+    years_num <- final_year - start_year + 1
     
-    lat_available <- RNetCDF::var.get.nc(nc_metadata, 'lat')
-    lon_available <- RNetCDF::var.get.nc(nc_metadata, 'lon')
+    loc_matrix <- matrix(data = NA, nrow = 12 * years_num, ncol = length(clim_vars) + 2)
     
-    obs_available <- length(RNetCDF::var.get.nc(nc_metadata, 'time'))
+    loc_matrix[, 1] <- rep(start_year:final_year, each = 12)
+    loc_matrix[, 2] <- rep(1:12, times = years_num)
+    
+    colnames(loc_matrix) <- c('year', 'month', clim_vars)
+    
+    for (i in 1:loc_num) clim_data[[i]] <- data.frame(loc_matrix)
+    
+    pb <- utils::txtProgressBar(min = 0, max = length(clim_vars) * years_num, initial = 0, style = 3) 
+    
+    for (var in clim_vars) {
+      for (year in start_year:final_year) {
+        file_path <- paste0(data_path, 'TerraClimate_', var, '_', year, '.nc')
+        
+        nc_metadata   <- RNetCDF::open.nc(file_path)
+        
+        lat_available <- RNetCDF::var.get.nc(nc_metadata, 'lat')
+        lon_available <- RNetCDF::var.get.nc(nc_metadata, 'lon')
+        
+        obs_available <- length(RNetCDF::var.get.nc(nc_metadata, 'time'))
+        
+        for (i in 1:loc_num) {
+          lat_index <- which.min(abs(lat_available - lat[i]))
+          lon_index <- which.min(abs(lon_available - lon[i]))
+          
+          start <- c(lon_index, lat_index, 1)
+          count <- c(1, 1, NA)
+          
+          values <- as.numeric(RNetCDF::var.get.nc(nc_metadata, variable = var, start = start, count = count, unpack = TRUE))
+          
+          col_index <- which(var == clim_vars) + 2
+          row_index <- 12 * (year - start_year) + 1
+          
+          clim_data[[i]][row_index:(row_index + 11), col_index] <- values
+        }
+        
+        utils::setTxtProgressBar(pb, years_num * (which(var == clim_vars) - 1) + (year - start_year + 1))
+      }
+    }
+    
+    close(pb)
     
     for (i in 1:loc_num) {
-      if (length(clim_data) < i) clim_data[[i]] <- data.frame(matrix(nrow = obs_available, ncol = 0))
+      if (all(c('ppt', 'tmin', 'tmax') %in% clim_vars)) {
+        biovars[[i]] <- calc_biovars(clim_data[[i]])
+      } else {
+        biovars[[i]] <- NULL
+      }
+      
+      clim_data[[i]] <- clim_data[[i]][start_month:(nrow(clim_data[[i]]) - final_month), ]
+      clim_data[[i]] <- clim_data[[i]][clim_data[[i]]$month %in% month_mask, ]
+      
+      rownames(clim_data[[i]]) <- 1:nrow(clim_data[[i]])
+    }
+  } else {
+    # setup the progress bar
+    pb <- utils::txtProgressBar(min = 0, max = loc_num * length(clim_vars), initial = 0, style = 3) 
 
-      # lat_selected  <- match(abs(lat_available - lat[i]) < 1/48, 1)
-      # lon_selected  <- match(abs(lon_available - lon[i]) < 1/48, 1)
-      # 
-      # lat_index <- which(lat_selected %in% 1)
-      # lon_index <- which(lon_selected %in% 1)
+    for (var in clim_vars) {
+      aggregate_url <- paste0('http://thredds.northwestknowledge.net:8080/thredds/dodsC/agg_terraclimate_', var, '_1958_CurrentYear_GLOBE.nc')
+      nc_metadata   <- RNetCDF::open.nc(aggregate_url)
       
-      lat_index <- which.min(abs(lat_available - lat[i]))
-      lon_index <- which.min(abs(lon_available - lon[i]))
+      lat_available <- RNetCDF::var.get.nc(nc_metadata, 'lat')
+      lon_available <- RNetCDF::var.get.nc(nc_metadata, 'lon')
       
-      start <- c(lon_index, lat_index, 1)
-      count <- c(1, 1, NA)
+      obs_available <- length(RNetCDF::var.get.nc(nc_metadata, 'time'))
       
-      # read in the full period of record using aggregated files
-      values <- as.numeric(RNetCDF::var.get.nc(nc_metadata, variable = var, start = start, count = count, unpack = TRUE))
-      
-      clim_data[[i]] <- cbind(clim_data[[i]], values)
-      
-      # update the progress bar
-      utils::setTxtProgressBar(pb, loc_num * which(clim_vars == var) - (loc_num - i))
-    }
-  }
-  
-  close(pb)
-  
-  biovars <- list()
-  
-  for (i in 1:loc_num) {
-    colnames(clim_data[[i]]) <- clim_vars
-    
-    years <- obs_available / 12
-    last  <- 1958 + years - 1
-    month <- rep(1:12, times = years)
-    year  <- rep(1958:last, each = 12)
-    
-    clim_data[[i]] <- cbind(year, month, clim_data[[i]])
-    
-    if (all(c('ppt', 'tmin', 'tmax') %in% clim_vars)) {
-      biovars[[i]] <- calc_biovars(clim_data[[i]][(start_row - (start_month - 1)):(final_row + (12 - final_month)), ])
-    } else {
-      biovars[[i]] <- NULL
+      for (i in 1:loc_num) {
+        if (length(clim_data) < i) clim_data[[i]] <- data.frame(matrix(nrow = obs_available, ncol = 0))
+        
+        lat_index <- which.min(abs(lat_available - lat[i]))
+        lon_index <- which.min(abs(lon_available - lon[i]))
+        
+        start <- c(lon_index, lat_index, 1)
+        count <- c(1, 1, NA)
+        
+        # read in the full period of record using aggregated files
+        values <- as.numeric(RNetCDF::var.get.nc(nc_metadata, variable = var, start = start, count = count, unpack = TRUE))
+        
+        clim_data[[i]] <- cbind(clim_data[[i]], values)
+        
+        # update the progress bar
+        utils::setTxtProgressBar(pb, loc_num * which(clim_vars == var) - (loc_num - i))
+      }
     }
     
-    clim_data[[i]] <- clim_data[[i]][start_row:final_row, ]
-    clim_data[[i]] <- clim_data[[i]][clim_data[[i]]$month %in% month_mask, ]
+    close(pb)
+    
+    for (i in 1:loc_num) {
+      colnames(clim_data[[i]]) <- clim_vars
+      
+      years <- obs_available / 12
+      last  <- 1958 + years - 1
+      month <- rep(1:12, times = years)
+      year  <- rep(1958:last, each = 12)
+      
+      clim_data[[i]] <- cbind(year, month, clim_data[[i]])
+      
+      if (all(c('ppt', 'tmin', 'tmax') %in% clim_vars)) {
+        biovars[[i]] <- calc_biovars(clim_data[[i]][(start_row - (start_month - 1)):(final_row + (12 - final_month)), ])
+      } else {
+        biovars[[i]] <- NULL
+      }
+      
+      clim_data[[i]] <- clim_data[[i]][start_row:final_row, ]
+      clim_data[[i]] <- clim_data[[i]][clim_data[[i]]$month %in% month_mask, ]
+      
+      rownames(clim_data[[i]]) <- 1:nrow(clim_data[[i]])
+    }
   }
-  
+
   return(list(climate = clim_data, biovars = biovars))
 }
 
@@ -2709,4 +3338,231 @@ calc_biovars <- function(data) {
   p[, 20] <- year
   
   return(as.data.frame(p))
+}
+
+
+#' Download TerraClimate netCDF Data Files to Extract their Data Offline
+#'
+#' @param from Start date as a string in the 'YYYY-MM-DD' format.
+#' @param to End date as a string in the 'YYYY-MM-DD' format.
+#' @param clim_vars List of all climate variables to be imported. Valid list includes: \emph{aet, def, pet,
+#'                 ppt, q, soil, srad, swe, tmax, tmin, vap, ws, vpd, and PDSI}. Default is NULL for all.
+#' @param data_path String containing the directory path where downloaded netCDF files exist (default is './data/')
+#' @param timeout Timeout in seconds to download each netCDF raster file (default is 300).
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso 
+#' \code{\link{get_terraclimate}}
+#' 
+#' @examples
+#' if (interactive()) {
+#'   ini_terraclimate('2018-09-01', '2019-06-30', c('ppt', 'tmin', 'tmax'))
+#'   
+#'   x <- c(-6.716, 35.917, 76.884)
+#'   y <- c(33.616, 33.833, 23.111)
+#'   
+#'   a <- get_terraclimate(y, x, '2018-09-01', '2019-06-30', c('ppt', 'tmin', 'tmax'))
+#'   
+#'   a$climate[[1]]
+#'   a$biovars[[1]]
+#'   
+#'   b <- get_terraclimate(y, x, '2018-09-01', '2019-06-30', c('ppt', 'tmin', 'tmax'), offline = TRUE)
+#'   
+#'   b$climate[[1]]
+#'   b$biovars[[1]]
+#' }
+#' @export
+
+ini_terraclimate <- function(from = '2019-09-01', to = '2022-06-30', clim_vars = c('ppt', 'tmin', 'tmax'), data_path = './data/', timeout = 300) {
+  options(timeout = timeout)
+  
+  download_url <- 'https://climate.northwestknowledge.net/TERRACLIMATE-DATA/'
+
+  start_year <- as.numeric(format(as.Date(from), '%Y'))
+  final_year <- as.numeric(format(as.Date(to), '%Y'))
+  
+  if (!dir.exists(data_path)) dir.create(data_path)
+  
+  for (var in clim_vars) {
+    for (year in start_year:final_year) {
+      file_path <- paste0(data_path, 'TerraClimate_', var, '_', year, '.nc')
+      file_url  <- paste0(download_url, 'TerraClimate_', var, '_', year, '.nc')
+      
+      if (!file.exists(file_path)) {
+        utils::download.file(file_url, file_path, mode = 'wb', method = 'libcurl')
+      }
+    }
+  }
+}
+
+
+## HWSDv2 ######################################################################
+
+#' Download and Setup HWSD v2.0 Data Files to Extract their Data Offline
+#'
+#' @param data_path String containing the directory path where downloaded HWSD v2.0 data files exist (default is './data/').
+#' @param timeout Timeout in seconds to download each HWSD v2.0 data file (default is 300).
+#' 
+#' @return 
+#' HWSDv2 object that has a list of two items: the HWSD2 raster and the HWSD2 SQLite connection.
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso 
+#' \code{\link{get_hwsd2}}
+#' 
+#' @export
+
+ini_hwsd2 <- function(data_path = './data/', timeout = 300){
+  options(timeout = timeout)
+  
+  con <- list()
+  
+  hwsd2_raster <- paste0(data_path, 'hwsd2.bil')
+  hwsd2_sqlite <- paste0(data_path, 'HWSD2.sqlite')
+  
+  # create the destination directory if it is not exists yet
+  if (!dir.exists(data_path)) {
+    dir.create(data_path)
+  }
+  
+  if (!file.exists(hwsd2_raster)) {
+    # import the HWSD v2 raster soil unit map (download then unzip, 4 files, 1.74 GB)
+    # https://s3.eu-west-1.amazonaws.com/data.gaezdev.aws.fao.org/HWSD/HWSD2_RASTER.zip
+    
+    hwsd2_raster_url <- 'https://s3.eu-west-1.amazonaws.com/data.gaezdev.aws.fao.org/HWSD/HWSD2_RASTER.zip'
+    hwsd2_raster_zip <- paste0(data_path, 'HWSD2_RASTER.zip')
+    
+    # download the raster file
+    utils::download.file(hwsd2_raster_url, hwsd2_raster_zip)
+    
+    # unzip the raster file in the given directory
+    utils::unzip(hwsd2_raster_zip, exdir = data_path)
+  }
+  
+  if (!file.exists(hwsd2_sqlite)) {
+    # load the SQLite version of the soil attribute database
+    # https://www.isric.org/sites/default/files/HWSD2.sqlite
+    
+    hwsd2_sqlite_url <- 'https://www.isric.org/sites/default/files/HWSD2.sqlite'
+    
+    # download the SQLite version of the HWSD v2 database
+    utils::download.file(hwsd2_sqlite_url, hwsd2_sqlite, method = 'libcurl', mode = 'wb')
+  }
+  
+  con$raster <- terra::rast(hwsd2_raster)
+  con$sqlite <- DBI::dbConnect(RSQLite::SQLite(), dbname = hwsd2_sqlite)
+  
+  return(con)
+}
+
+
+#' Get HWSD v2 Soil Data for a Given Location(s)
+#'
+#' @description
+#' The HWSD2_SMU table contains general information for each of the soil units 
+#' occurring in any given SMU code (dominant soil unit and up to 11 associated soils).
+#' 
+#' The SEQUENCE column refers to the sequence in which soil units within the SMU 
+#' are presented (in order of percentage share). The dominant soil has sequence 1. 
+#' The sequence can range between 1 and 12.
+#' 
+#' The SHARE column refers to the share of the soil unit within the mapping unit in 
+#' percentage. Shares of soil units within a mapping unit always sum up to 100 percent.
+#' 
+#' The HWSD2_LAYERS table provides soil attributes per depth layer for each of the 
+#' seven depth layers (D1 to D7) separately (represented in the LAYER column in the 
+#' HWSD2_LAYERS table). The depth of the top and bottom of each layer is defined in
+#' the TOPDEP and BOTDEP columns, respectively. 
+#'
+#' @param df data.frame that list locations info including the coordinates in decimal degree format.
+#' @param con the HWSDv2 object returns from the ini_hwsd2() function.
+#' @param x longitude column name in the df data.frame (default is 'Longitude').
+#' @param y latitude column name in the df data.frame (default is 'Latitude').
+#' @param sequence the sequence in which soil units are presented (in order of percentage share). 
+#'                 The dominant soil has sequence 1. The sequence can range between 1 and 12.
+#' @param layer the depth layer range from 'D1' to 'D7'. The depth of the top and bottom of 
+#'              each layer is defined in the TOPDEP and BOTDEP columns, respectively.
+#' 
+#' @author 
+#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' 
+#' @seealso 
+#' \code{\link{ini_hwsd2}}
+#' 
+#' @examples
+#' if (interactive()) {
+#'   # create a simple data.frame for a list of locations and their coordinates
+#'   Location  <- c('Tel-Hadya', 'Terbol', 'Marchouch')
+#'   Latitude  <- c(36.016, 33.808, 33.616)
+#'   Longitude <- c(36.943, 35.991, -6.716)
+#'   
+#'   sites <- data.frame(Location, Latitude, Longitude)
+#'   
+#'   # initiate, download, and setup the HWSD v2 in a given local directory
+#'   hwsd2 <- ini_hwsd2(data_path = 'C:/Users/Kel-shamaa/Downloads/HWSD v2/')
+#'   
+#'   # query soil attributes for given sites using the HWSD v2 connection object
+#'   #
+#'   # sequence parameter, range between 1 and 12 (max), 1 is the dominant soil.
+#'   # returned df has SHARE column refers to share%
+#'   #
+#'   # layer parameter refers to depth layer (D1 to D7).
+#'   # returned df has TOPDEP/BOTDEP columns represent top/bottom layer depth in cm.
+#'   sites <- get_hwsd2(df = sites, 
+#'                      con = hwsd2, 
+#'                      x = 'Longitude', 
+#'                      y = 'Latitude', 
+#'                      sequence = 1, 
+#'                      layer = 'D1')
+#' }
+#' @export
+
+get_hwsd2 <- function(df, con, x = 'longitude', y = 'latitude', sequence = 1, layer = 'D1') {
+  total_loc <- nrow(df)
+  
+  df$seq_id <- 1:total_loc
+  df$smu_id <- NULL
+  
+  # setup the progress bar
+  pb <- utils::txtProgressBar(min = 0, max = total_loc, initial = 0, style = 3) 
+  
+  for(i in 1:total_loc) {
+    longitude <- df[i, x]
+    latitude  <- df[i, y]
+    
+    # crop the raster for the given coordinates using the raster resolution unit as the bounding box dimensions
+    hwsd_loc <- terra::crop(con$raster, terra::ext(c(longitude, longitude + terra::res(con$raster)[1], latitude, latitude + terra::res(con$raster)[2]))) 
+    
+    # extract the raster pixel code (Soil Mapping Unit ID)
+    df[i, 'smu_id'] <- hwsd_loc[1]
+    
+    # update progress bar every 5%
+    if(i %% ceiling(total_loc/20) == 0) utils::setTxtProgressBar(pb,i)
+  }
+  
+  # set the progress bar at 100% and close it
+  utils::setTxtProgressBar(pb, i)
+  close(pb)
+  
+  # get a list of unique smu ids 
+  ids <- paste(unique(terra::na.omit(df$smu_id)), collapse = ',')
+  
+  # build up SQL statement conditions
+  SEQ <- ifelse(sequence %in% 1:12, paste('SEQUENCE = ', sequence), 'SEQUENCE > 0')
+  LYR <- ifelse(layer %in% paste0('D', 1:7), paste0('LAYER = "', layer, '"'), 'LAYER like "%"')
+  
+  # retrieve soil data for the selected soil component and depth layer
+  hwds2_layers <- DBI::dbGetQuery(con$sqlite, paste('select * from HWSD2_LAYERS where', SEQ, 'and', LYR, 'and HWSD2_SMU_ID in (', ids, ')'))
+  
+  # associate soil attribution columns to the original sites data frame
+  df <- merge(df, hwds2_layers, by.x = 'smu_id', by.y = 'HWSD2_SMU_ID', sort = FALSE)
+  
+  # sort records by soil component share and then layer depth
+  df <- df[with(df, order(seq_id, SEQUENCE, LAYER)), ]
+  
+  return(df)
 }

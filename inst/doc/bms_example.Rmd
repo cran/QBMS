@@ -11,7 +11,7 @@ vignette: >
 
 # QBMS
 <!-- https://shields.io/ -->
-Linking data management systems to analytics is an important step in breeding digitalization. Breeders can use this R package to Query the Breeding Management System(s) like [BMS](https://bmspro.io/), [BreedBase](https://breedbase.org), and [GIGWA](https://southgreen.fr/content/gigwa) (using [BrAPI](https://brapi.org/) calls) and help them to retrieve phenotypic and genotypic data directly into their analyzing pipelines developed in R statistical environment.
+This R package assists breeders in linking data systems with their analytic pipelines, a crucial step in digitizing breeding processes. It supports querying and retrieving phenotypic and genotypic data from systems like [EBS](https://ebs.excellenceinbreeding.org/), [BMS](https://bmspro.io/), [BreedBase](https://breedbase.org), and [GIGWA](https://github.com/SouthGreenPlatform/Gigwa2) (using [BrAPI](https://brapi.org/) calls). Extra helper functions support environmental data sources, including [TerraClimate](https://www.climatologylab.org/terraclimate.html) and FAO [HWSDv2](https://gaez.fao.org/pages/hwsd) soil database.
 
 ## Breeding Management System
 Breeding Management System ([BMS](https://bmspro.io/)) is an information management system developed by the Integrated Breeding Platform to help breeders manage the breeding process, from programme planning to decision-making. The BMS is customizable for most crop breeding programs, and comes pre-loaded with curated ontology terms for many crops (bean, cassava, chickpea, cowpea, groundnut, maize, rice, sorghum, soybean, wheat, and others). The BMS is available as a cloud application, which can be installed on local or remote servers and accessed by multiple users.
@@ -21,11 +21,13 @@ The Breeding API ([BrAPI](https://brapi.org/)) project is an effort to enable in
 
 ## _Install_
 ```r
-install.packages("remotes")
+if (!require("remotes")) install.packages("remotes")
 remotes::install_github("icarda-git/QBMS")
 ```
 
 ___If you are not already an active BMS user, you can contact [IBP support](https://ibplatform.atlassian.net/servicedesk/customer/portal/4/group/30/create/60) to get access to a trial BMS server.___
+
+> _From BMS version 25 onward, users must possess the necessary permissions to utilize the BrAPI services. [This table](https://ibplatform.atlassian.net/wiki/spaces/BMS/pages/2870968321/v25+BMS+permissions+required+for+using+BrAPI+services) outlines the permissions needed for accessing specific services._
 
 ## _Example_
 ```r
@@ -33,7 +35,7 @@ ___If you are not already an active BMS user, you can contact [IBP support](http
 library(QBMS)
 
 # config your BMS connection (by providing your BMS login page URL)
-set_qbms_config("https://www.bms-uat-test.net/ibpworkbench/controller/auth/login")
+set_qbms_config("https://bms.icarda.org/ibpworkbench/controller/auth/login")
 
 # login using your BMS account (interactive mode)
 # or pass your BMS username and password as parameters (batch mode)
@@ -43,41 +45,41 @@ login_bms()
 list_crops()
 
 # select a crop by name
-set_crop("maize")
+set_crop("wheat")
 
 # list all breeding programs in the selected crop
 list_programs()
 
 # select a breeding program by name
-set_program("MC Maize")
+set_program("Wheat International Nurseries")
 
 # list all studies/trials in the selected program
 list_trials()
 
 # filtered by year of starting date
-list_trials(2020)
+list_trials(2022)
 
 # select a specific study/trial by name
-set_trial("2018 PVT")
-
-# get observation variable ontology in the selected study/trial
-ontology <- get_trial_obs_ontology()
+set_trial("IDYT39")
 
 # list all environments/locations information in the selected study/trial
 list_studies()
 
 # select a specific environment/location by name
-set_study("2018 PVT Environment Number 1")
+set_study("IDYT39 Environment Number 9")
 
 # select a specific study by location name (first match)
 studies <- list_studies()
-set_study(studies[studies$locationName == "BASF Bremen", "studyName"][1])
+set_study(studies[studies$locationName == "Amlaha", "studyName"][1])
 
 # retrieve data, general information, and germplasm list 
 # of the selected environment/location
 data <- get_study_data()
 info <- get_study_info()
 germplasm <- get_germplasm_list()
+
+# get observation variable ontology in the selected study/trial
+ontology <- get_trial_obs_ontology()
 
 # get the pedigree table
 pedigree_table <- get_pedigree_table(germplasm, "germplasmName", "pedigree")
@@ -90,9 +92,10 @@ program_studies <- get_program_studies()
 
 # retrieve observations data of given germplasm aggregated from all trials 
 # in the selected program
-germplasm_observations <- get_germplasm_data("BASFCORN-2-1")
+# e.g., https://www.croptrust.org/news-events/campaigns/jabal-durum-wheat-variety/
+germplasm_observations <- get_germplasm_data("Jabal")
 
 # retrieve germplasm attributes for a given germplasm in a crop
-germplasm_attributes <- get_germplasm_attributes("BASFCORN-2-1")
+germplasm_attributes <- get_germplasm_attributes("Jabal")
 
 ```

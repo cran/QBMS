@@ -1,17 +1,18 @@
 # QBMS <img src='man/figures/logo.png' align="right" height="140" />
 <!-- badges: start -->
-<!--[![CRAN checks](https://badges.cranchecks.info/summary/QBMS.svg)](https://cran.r-project.org/web/checks/check_results_QBMS.html)-->
+[![CRAN checks](https://badges.cranchecks.info/summary/QBMS.svg)](https://cran.r-project.org/web/checks/check_results_QBMS.html)
 [![CRAN version](https://www.r-pkg.org/badges/version/QBMS)](https://cran.r-project.org/package=QBMS)
 [![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/QBMS)](https://cran.r-project.org/package=QBMS)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10791627.svg)](https://doi.org/10.5281/zenodo.10791627)
-[![CRAN license](https://img.shields.io/github/license/icarda-git/QBMS)](https://www.gnu.org/licenses/gpl-3.0.en.html)
-[![GitHub commits](https://img.shields.io/github/last-commit/icarda-git/QBMS)](https://github.com/icarda-git/QBMS/commits/master)
-[![GitHub issues](https://img.shields.io/github/issues-raw/icarda-git/QBMS)](https://github.com/icarda-git/QBMS/issues)
-[![R badge](https://img.shields.io/badge/Build%20with-♥%20and%20R-blue)](https://github.com/icarda-git/QBMS)
+[![CRAN monthly](https://cranlogs.r-pkg.org/badges/QBMS)](https://cran.r-project.org/package=QBMS)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10791626.svg)](https://doi.org/10.5281/zenodo.10791626)
+[![CRAN license](https://img.shields.io/github/license/icarda/QBMS)](https://www.gnu.org/licenses/gpl-3.0.en.html)
+[![GitHub commits](https://img.shields.io/github/last-commit/icarda/QBMS)](https://github.com/icarda/QBMS/commits/master)
+[![GitHub issues](https://img.shields.io/github/issues-raw/icarda/QBMS)](https://github.com/icarda/QBMS/issues)
+[![R badge](https://img.shields.io/badge/Build%20with-♥%20and%20R-blue)](https://www.r-project.org/)
 <!-- badges: end -->
 
 ## Overview
-This R package assists breeders in linking data systems with their analytic pipelines, a crucial step in digitizing breeding processes. It supports querying and retrieving phenotypic and genotypic data from systems like [EBS](https://ebs.excellenceinbreeding.org/), [BMS](https://bmspro.io/), [BreedBase](https://breedbase.org), and [GIGWA](https://github.com/SouthGreenPlatform/Gigwa2) (using [BrAPI](https://brapi.org/) calls). Extra helper functions support environmental data sources, including [TerraClimate](https://www.climatologylab.org/terraclimate.html) and FAO [HWSDv2](https://gaez.fao.org/pages/hwsd) soil database.
+This R package assists breeders in linking data systems with their analytic pipelines, a crucial step in digitizing breeding processes. It supports querying and retrieving phenotypic and genotypic data from systems like [EBS](https://ebs.excellenceinbreeding.org/), [BMS](https://bmspro.io/), [BreedBase](https://breedbase.org), [GIGWA](https://github.com/SouthGreenPlatform/Gigwa2), and [Germinate](https://germinateplatform.github.io/get-germinate/) (using [BrAPI](https://brapi.org/) calls). Extra helper functions support environmental data sources, including [TerraClimate](https://www.climatologylab.org/terraclimate.html) and FAO [HWSDv2](https://gaez.fao.org/pages/hwsd) soil database.
 
 >___Author and Maintainer:__ [Khaled Al-Shamaa](https://github.com/khaled-alshamaa) <k.el-shamaa (at) cgiar (dot) org>_
 >
@@ -21,7 +22,7 @@ This R package assists breeders in linking data systems with their analytic pipe
 >
 >___Contributor:__ [Johan Aparicio](https://github.com/apariciojohan) <j.aparicio (at) cgiar (dot) org>_
 >
->___Copyright Holder:__ [International Center for Agricultural Research in the Dry Areas (ICARDA)](https://www.icarda.org/)_
+>___Copyright Holder:__ [International Center for Agricultural Research in the Dry Areas (ICARDA)](https://icarda.org/)_
 
 ## BrAPI
 The Breeding API ([BrAPI](https://brapi.org/)) project is an effort to enable interoperability among plant breeding databases. BrAPI is a standardized RESTful web service API specification for communicating plant breeding data. This community driven standard is free to be used by anyone interested in plant breeding data management.
@@ -32,6 +33,7 @@ The Breeding API ([BrAPI](https://brapi.org/)) project is an effort to enable in
 * [EBS](https://ebs.excellenceinbreeding.org/): `vignette("ebs_example")`.
 * [Breedbase](https://breedbase.org/): `vignette("breedbase_example")`.
 * [GIGWA](https://github.com/SouthGreenPlatform/Gigwa2): `vignette("gigwa_example")`.
+* [Germinate](https://germinateplatform.github.io/get-germinate/):  `vignette("germinate_example")`.
 
 > ___Extra sub-systems supported:___
 > 
@@ -49,7 +51,7 @@ install.packages("QBMS")
 
 ```r
 if (!require("remotes")) install.packages("remotes")
-remotes::install_github("icarda-git/QBMS")
+remotes::install_github("icarda/QBMS")
 ```
 
 ## Getting Started
@@ -80,7 +82,7 @@ You can switch between an ongoing QBMS connection and another server/database co
 
 ```r
 # configure QBMS to connect the phenotypics server
-set_qbms_config("https://www.bms-uat-test.net/ibpworkbench/controller/auth/login")
+set_qbms_config("https://bms.icarda.org/ibpworkbench/controller/auth/login")
 
 # login and retrieve data from the phenotypic server
 
@@ -103,7 +105,7 @@ set_qbms_connection(con1)
 
 > A detailed example is available in the documentation of the `get_qbms_connection()` and `set_qbms_connection()` functions.
 
-Also, you can find a more elegant solution developed by [Francisco Agosto-Perez](https://ilci.cornell.edu/our-team/francisco-agosto-perez/) from the Breeding Informatics team within the Innovation Lab For Crop Improvement at Cornell University available here: 
+Also, you can find a more elegant solution developed by [Francisco Agosto-Perez](https://cals.cornell.edu/people/francisco-agosto-perez) from the Breeding Informatics team within the Innovation Lab For Crop Improvement at Cornell University available here: 
 [https://github.com/agostof/BrAPI-Provider/](https://github.com/agostof/BrAPI-Provider/)
 
 ## Error and Debugging
@@ -117,7 +119,7 @@ dump$config
 # [1] "maize"
 # 
 # $server
-# [1] "https://www.bms-uat-test.net"
+# [1] "https://bms.icarda.org"
 # 
 # $path
 # [1] "bmsapi"
@@ -129,7 +131,7 @@ dump$config
 # [1] 120
 # 
 # $base_url
-# [1] "https://www.bms-uat-test.net/bmsapi"
+# [1] "https://bms.icarda.org/bmsapi"
 # 
 # $engine
 # [1] "bms"
@@ -150,7 +152,7 @@ dump$state$token
 ```r
 Sys.setenv("R_REMOTES_NO_ERRORS_FROM_WARNINGS" = TRUE)
 
-remotes::install_github("icarda-git/QBMS", upgrade = "always")
+remotes::install_github("icarda/QBMS", upgrade = "always")
 ```
 
 3. If you get an error related to list or set runs in GIGWA (i.e., `gigwa_list_runs()` and `gigwa_set_run()` functions), you can try to ensure that your R session system locale is using UTF-8 character set encoding. You may consider overwriting your system locale with the following command to resolve this issue:

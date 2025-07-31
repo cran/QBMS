@@ -4,12 +4,14 @@
 \alias{brapi_get_call}
 \title{Internal Function for Core BrAPI GET Calls}
 \usage{
-brapi_get_call(call_url, nested = TRUE)
+brapi_get_call(call_url, nested = TRUE, caller_func = NA)
 }
 \arguments{
 \item{call_url}{Character string specifying the base URL of the API endpoint to request.}
 
 \item{nested}{Logical value indicating whether to flatten nested lists in the JSON responses. Defaults to \code{TRUE}.}
+
+\item{caller_func}{Character string identifying the name of the function that invoked \code{brapi_get_call()}.}
 }
 \value{
 A list containing the consolidated data and associated metadata from the API response.
@@ -28,5 +30,5 @@ This function performs the following steps:
 It relies on global variables from \code{qbms_globals} to manage state and configuration.
 }
 \author{
-Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 }

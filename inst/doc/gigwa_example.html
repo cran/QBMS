@@ -12,7 +12,7 @@
 
 <meta name="author" content="Khaled Al-Shamaa" />
 
-<meta name="date" content="2024-09-18" />
+<meta name="date" content="2025-07-31" />
 
 <title>GIGWA Example</title>
 
@@ -62,7 +62,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
 { counter-reset: source-line 0; }
@@ -340,7 +340,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <h1 class="title toc-ignore">GIGWA Example</h1>
 <h4 class="author">Khaled Al-Shamaa</h4>
-<h4 class="date">2024-09-18</h4>
+<h4 class="date">2025-07-31</h4>
 
 
 
@@ -455,7 +455,7 @@ update significantly improves the QBMS allele matrix retrieval speed,
 increasing it by more than 10 times, as demonstrated by benchmark
 tests.</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Configure your GIGWA connection</span></span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">set_qbms_config</span>(<span class="st">&quot;https://gigwa.southgreen.fr/gigwa/&quot;</span>, </span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">set_qbms_config</span>(<span class="st">&quot;https://gigwa-dev.southgreen.fr/gigwaV2/&quot;</span>, <span class="at">page_size =</span> <span class="dv">50000</span>,</span>
 <span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>                <span class="at">time_out =</span> <span class="dv">300</span>, <span class="at">engine =</span> <span class="st">&quot;gigwa&quot;</span>, <span class="at">no_auth =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a></span>
 <span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="co"># Select a database by name</span></span>
@@ -491,7 +491,12 @@ tests.</p>
 <span id="cb2-35"><a href="#cb2-35" tabindex="-1"></a>                                    <span class="co"># samples = germplasmNames, # gigwa_get_samples()</span></span>
 <span id="cb2-36"><a href="#cb2-36" tabindex="-1"></a>                                    <span class="co"># snps_pageSize = 10000,</span></span>
 <span id="cb2-37"><a href="#cb2-37" tabindex="-1"></a>                                    <span class="co"># samples_pageSize = 100,</span></span>
-<span id="cb2-38"><a href="#cb2-38" tabindex="-1"></a>                                    )</span></code></pre></div>
+<span id="cb2-38"><a href="#cb2-38" tabindex="-1"></a>                                    )</span>
+<span id="cb2-39"><a href="#cb2-39" tabindex="-1"></a></span>
+<span id="cb2-40"><a href="#cb2-40" tabindex="-1"></a><span class="do">### Get The Whole Variant Set ##################################################</span></span>
+<span id="cb2-41"><a href="#cb2-41" tabindex="-1"></a></span>
+<span id="cb2-42"><a href="#cb2-42" tabindex="-1"></a>?get_variantset</span>
+<span id="cb2-43"><a href="#cb2-43" tabindex="-1"></a>snps <span class="ot">&lt;-</span> <span class="fu">get_variantset</span>()</span></code></pre></div>
 </div>
 
 

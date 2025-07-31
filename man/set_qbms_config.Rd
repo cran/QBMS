@@ -26,7 +26,7 @@ set_qbms_config(
 
 \item{no_auth}{Logical, whether the server requires authentication (default is FALSE).}
 
-\item{engine}{The backend system (default is "bms"). Options include "bms", "gigwa", "breedbase", "ebs".}
+\item{engine}{The backend system (default is "bms"). Options include "bms", "gigwa", "breedbase", "ebs", "germinate".}
 
 \item{brapi_ver}{The version of BrAPI to use, either "v1" or "v2" (default is "v1").}
 
@@ -45,5 +45,5 @@ set_qbms_config("https://bms.icarda.org/ibpworkbench")
 
 }
 \author{
-Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 }

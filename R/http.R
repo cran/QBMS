@@ -42,45 +42,6 @@ rbindlistx <- function(x) {
   d <- as.data.frame(l)
 }
 
-#' Generate Common HTTP Headers for API Requests
-#'
-#' @description
-#' This function constructs a list of standard HTTP headers required for making API 
-#' requests, ensuring proper authentication and encoding. These headers are typically 
-#' included with each API call to provide necessary information such as authorization 
-#' tokens and content acceptance types. The function is designed to work with 
-#' authenticated APIs, including BrAPI.
-#'
-#' @return
-#' A named list of common HTTP headers, including the authorization token (Bearer), 
-#' content encoding, and accepted content types.
-#'
-#' @note
-#' Ensure that the global state contains a valid authorization token before making API 
-#' requests. This function retrieves the token from `qbms_globals$state$token`, which 
-#' should be set after a successful login or authentication process.
-#'
-#' @return 
-#' A named list containing key HTTP headers, including:
-#' \itemize{
-#'   \item \strong{Authorization:} Bearer token used for authenticated API access.
-#'   \item \strong{Accept-Encoding:} Specifies supported compression types such as gzip and deflate.
-#'   \item \strong{Accept:} Specifies that the client accepts responses in JSON format.
-#' }
-#' 
-#' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-
-brapi_headers <- function() {
-  auth_code <- paste0("Bearer ", qbms_globals$state$token)
-  headers   <- c(
-    "Authorization" = auth_code, 
-    "Accept-Encoding" = "gzip, deflate",
-    "accept" = "application/json"
-  )
-  headers
-}
-
 
 #' Asynchronously Fetch a Single API Page
 #'
@@ -97,15 +58,18 @@ brapi_headers <- function() {
 #' It retrieves the content from the specified URL, checks for HTTP errors, and parses the JSON response.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 
 get_async_page <- function(full_url, nested) {
   future::future({
     req <- httr2::request(full_url)
     req <- httr2::req_headers(req, "accept" = "application/json")
     req <- httr2::req_headers(req, "Accept-Encoding" = "gzip, deflate")
-    req <- httr2::req_headers(req, "Authorization" = paste0("Bearer ", qbms_globals$state$token))
-
+    
+    if (!is.na(qbms_globals$state$token)) {
+      req <- httr2::req_headers(req, "Authorization" = paste0("Bearer ", qbms_globals$state$token))
+    }
+    
     resp <- httr2::req_perform(req)
     httr2::resp_check_status(resp)
     httr2::resp_body_json(resp, simplifyVector = TRUE, flatten = !nested)
@@ -127,14 +91,17 @@ get_async_page <- function(full_url, nested) {
 #' It retrieves and parses the JSON responses from each URL provided.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 
 get_async_pages <- function(pages, nested) {
   future.apply::future_lapply(pages, function(full_url) {
     req <- httr2::request(full_url)
-    req <- httr2::req_headers(req, "accept" = "application/json")
+    req <- httr2::req_headers(req, "Accept" = "application/json")
     req <- httr2::req_headers(req, "Accept-Encoding" = "gzip, deflate")
-    req <- httr2::req_headers(req, "Authorization" = paste0("Bearer ", qbms_globals$state$token))
+    
+    if (!is.na(qbms_globals$state$token)) {
+      req <- httr2::req_headers(req, "Authorization" = paste0("Bearer ", qbms_globals$state$token))
+    }
     
     resp <- httr2::req_perform(req)
     httr2::resp_check_status(resp)
@@ -149,6 +116,7 @@ get_async_pages <- function(pages, nested) {
 #'
 #' @param call_url Character string specifying the base URL of the API endpoint to request.
 #' @param nested Logical value indicating whether to flatten nested lists in the JSON responses. Defaults to \code{TRUE}.
+#' @param caller_func Character string identifying the name of the function that invoked \code{brapi_get_call()}.
 #'
 #' @return A list containing the consolidated data and associated metadata from the API response.
 #'
@@ -163,48 +131,60 @@ get_async_pages <- function(pages, nested) {
 #' It relies on global variables from \code{qbms_globals} to manage state and configuration.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 
-brapi_get_call <- function(call_url, nested = TRUE) {
+brapi_get_call <- function(call_url, nested = TRUE, caller_func = NA) {
   separator <- if (grepl("\\?", call_url)) "&" else "?"
   full_url  <- paste0(call_url, separator, "page=0&pageSize=", qbms_globals$config$page_size)
-  
+
+  # caller_func <- ifelse(is.call(sys.call(-1)) && identical(sys.call(-1)[[1]], as.symbol("::")), sys.call(-1)[[3]], sys.call(-1))
+  full_url <- engine_pre_process(full_url, qbms_globals$config$engine, caller_func)
+
   # Fetch the first page synchronously to get total number of pages
   result_future <- get_async_page(full_url, nested)
   result_object <- future::value(result_future)
   result_data   <- as.data.frame(result_object$result$data)
   total_pages   <- result_object$metadata$pagination$totalPages
-  
-  if (total_pages > 1) {
-    pages <- seq(1, total_pages - 1)
-    full_urls <- paste0(call_url, separator, "page=", pages, "&pageSize=", qbms_globals$config$page_size)
+
+  if (!is.null(total_pages)) {
+    if (total_pages > 1) {
+      pages <- seq(1, total_pages - 1)
+      full_urls <- paste0(call_url, separator, "page=", pages, "&pageSize=", qbms_globals$config$page_size)
+
+      # Fetch remaining pages asynchronously
+      all_pages <- get_async_pages(full_urls, nested)
+
+      # Combine data from all pages
+      for (n in seq_along(all_pages)) {
+        page_data <- as.data.frame(all_pages[[n]]$result$data)
+        result_data <- rbindx(result_data, page_data)
+      }
+    }
     
-    # Fetch remaining pages asynchronously
-    all_pages <- get_async_pages(full_urls, nested)
-    
-    # Combine data from all pages
-    for (n in seq_along(all_pages)) {
-      page_data <- as.data.frame(all_pages[[n]]$result$data)
-      result_data <- rbindx(result_data, page_data)
+    # Finalize the result data
+    if (ncol(result_data) == 1) {
+      result_object$result$data <- result_data[, 1]
+    } else {
+      result_object$result$data <- result_data
     }
   }
   
-  # Finalize the result data
-  if (ncol(result_data) == 1) {
-    result_object$result$data <- result_data[, 1]
+  if (!is.null(result_object$result)) {
+    result_data <- result_object$result
+
+    # Update global state with pagination info
+    qbms_globals$state$current_page <- result_object$metadata$pagination$currentPage
+    qbms_globals$state$page_size    <- result_object$metadata$pagination$pageSize
+    qbms_globals$state$total_count  <- result_object$metadata$pagination$totalCount
+    qbms_globals$state$total_pages  <- result_object$metadata$pagination$totalPages
+    qbms_globals$state$errors       <- result_object$errors
+    
+    # caller_func <- ifelse(is.call(sys.call(-1)) && identical(sys.call(-1)[[1]], as.symbol("::")), sys.call(-1)[[3]], sys.call(-1))
+    result_data <- engine_post_process(result_data, qbms_globals$config$engine, caller_func)
   } else {
-    result_object$result$data <- result_data
+    result_data <- NULL
   }
-  
-  result_data <- result_object$result
-  
-  # Update global state with pagination info
-  qbms_globals$state$current_page <- result_object$metadata$pagination$currentPage
-  qbms_globals$state$page_size    <- result_object$metadata$pagination$pageSize
-  qbms_globals$state$total_count  <- result_object$metadata$pagination$totalCount
-  qbms_globals$state$total_pages  <- result_object$metadata$pagination$totalPages
-  qbms_globals$state$errors       <- result_object$errors
-  
+
   return(result_data)
 }
 
@@ -224,20 +204,21 @@ brapi_get_call <- function(call_url, nested = TRUE) {
 #' A list of results obtained from the BrAPI POST call.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 
 brapi_post_search_allelematrix <- function(call_url, call_body, nested = TRUE) {
-  # Prepare headers without the 'Authorization' header
-  headers <- brapi_headers()
   call_url <- utils::URLencode(call_url)
   
   # Build the POST request
   req <- httr2::request(call_url)
   req <- httr2::req_headers(req, "accept" = "application/json")
   req <- httr2::req_headers(req, "Accept-Encoding" = "gzip, deflate")
-  req <- httr2::req_headers(req, "Authorization" = paste0("Bearer ", qbms_globals$state$token))
   req <- httr2::req_timeout(req, seconds = qbms_globals$config$time_out)
   req <- httr2::req_body_raw(req, call_body, type = "application/json")
+  
+  if (!is.na(qbms_globals$state$token)) {
+    req <- httr2::req_headers(req, "Authorization" = paste0("Bearer ", qbms_globals$state$token))
+  }
   
   # Perform the POST request
   resp <- httr2::req_perform(req)
@@ -258,9 +239,12 @@ brapi_post_search_allelematrix <- function(call_url, call_body, nested = TRUE) {
       get_req <- httr2::request(get_url)
       get_req <- httr2::req_headers(get_req, "accept" = "application/json")
       get_req <- httr2::req_headers(get_req, "Accept-Encoding" = "gzip, deflate")
-      get_req <- httr2::req_headers(get_req, "Authorization" = paste0("Bearer ", qbms_globals$state$token))
       get_req <- httr2::req_timeout(get_req, seconds = qbms_globals$config$time_out)
-
+      
+      if (!is.na(qbms_globals$state$token)) {
+        get_req <- httr2::req_headers(get_req, "Authorization" = paste0("Bearer ", qbms_globals$state$token))
+      }
+      
       # Perform the GET request
       resp <- httr2::req_perform(get_req)
       httr2::resp_check_status(resp)
@@ -292,10 +276,9 @@ brapi_post_search_allelematrix <- function(call_url, call_body, nested = TRUE) {
 #' A list of results obtained from the BrAPI POST call.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 
 brapi_post_search_call <- function(call_url, call_body, nested = TRUE) {
-  headers  <- brapi_headers()
   call_url <- utils::URLencode(call_url)
   
   page_info <- paste0('{"page": {page}, "pageToken": {page}, "pageSize": ', qbms_globals$config$page_size)
@@ -310,9 +293,12 @@ brapi_post_search_call <- function(call_url, call_body, nested = TRUE) {
     req <- httr2::request(call_url)
     req <- httr2::req_headers(req, "accept" = "application/json")
     req <- httr2::req_headers(req, "Accept-Encoding" = "gzip, deflate")
-    req <- httr2::req_headers(req, "Authorization" = paste0("Bearer ", qbms_globals$state$token))
     req <- httr2::req_timeout(req, seconds = qbms_globals$config$time_out)
     req <- httr2::req_body_raw(req, page_body, type = "application/json")
+    
+    if (!is.na(qbms_globals$state$token)) {
+      req <- httr2::req_headers(req, "Authorization" = paste0("Bearer ", qbms_globals$state$token))
+    }      
 
     # Perform the POST request
     resp <- httr2::req_perform(req)
@@ -333,8 +319,11 @@ brapi_post_search_call <- function(call_url, call_body, nested = TRUE) {
         get_req <- httr2::request(get_url)
         get_req <- httr2::req_headers(get_req, "accept" = "application/json")
         get_req <- httr2::req_headers(get_req, "Accept-Encoding" = "gzip, deflate")
-        get_req <- httr2::req_headers(get_req, "Authorization" = paste0("Bearer ", qbms_globals$state$token))
         get_req <- httr2::req_timeout(get_req, seconds = qbms_globals$config$time_out)
+        
+        if (!is.na(qbms_globals$state$token)) {
+          get_req <- httr2::req_headers(get_req, "Authorization" = paste0("Bearer ", qbms_globals$state$token))
+        }
 
         # Perform the GET request
         resp <- httr2::req_perform(get_req)
@@ -355,7 +344,7 @@ brapi_post_search_call <- function(call_url, call_body, nested = TRUE) {
       results$metadata$pagination$totalPages <- with(results$metadata$pagination, ceiling(totalCount / pageSize))
     }
     
-    if (results$metadata$pagination$totalPages == 1) {
+    if (results$metadata$pagination$totalPages <= 1) {
       break
     } else {
       if (results$metadata$pagination$currentPage == 0) {

@@ -46,6 +46,16 @@ brapi_map <- rbind(brapi_map, c("get_trial_obs_ontology", "v2", "search/variable
 brapi_map <- rbind(brapi_map, c("get_germplasm_id", "v1", "germplasm?germplasmName={germplasmName}"))
 brapi_map <- rbind(brapi_map, c("get_germplasm_id", "v2", "germplasm?germplasmName={germplasmName}"))
 
+brapi_map <- rbind(brapi_map, c("get_trial_pedigree", "v2", "pedigree?trialDbId={trialDbId}&includeFullTree=true&includeParents=true"))
+
+brapi_map <- rbind(brapi_map, c("list_runs", "v2", "variantsets?programDbId={programDbId}&studyDbId={studyDbId}"))
+brapi_map <- rbind(brapi_map, c("get_variants", "v2", "variantsets/{variantSetDbId}/calls"))
+brapi_map <- rbind(brapi_map, c("get_variant_set", "v2", "variantsets/{variantSetDbId}"))
+
+brapi_map <- rbind(brapi_map, c("get_map", "v2", "maps?studyDbId={studyDbId}"))
+brapi_map <- rbind(brapi_map, c("get_marker_map", "v2", "markerpositions?mapDbId={mapDbId}"))
+
+
 # POST: germplasmDbIds, observationLevel = "PLOT"
 brapi_map <- rbind(brapi_map, c("get_germplasm_data", "v1", "phenotypes-search"))
 
@@ -101,13 +111,14 @@ colnames(brapi_map) <- c("func_name", "brapi_ver", "brapi_call")
 #' A string representing the BrAPI endpoint URL.
 #'
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 
 get_brapi_url <- function(func_name) {
   call_url <- paste0(qbms_globals$config$base_url, 
                      ifelse(qbms_globals$config$crop == "", "", paste0("/", qbms_globals$config$crop)), 
                      "/brapi/", qbms_globals$config$brapi_ver, "/", 
                      brapi_map[brapi_map$func_name == func_name & brapi_map$brapi_ver == qbms_globals$config$brapi_ver, "brapi_call"])
+  
   return(call_url)
 }
 
@@ -126,7 +137,7 @@ get_brapi_url <- function(func_name) {
 #' A data frame listing the QBMS function, BrAPI endpoint URL, and availability status for each endpoint.
 #'
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #'
 #' @export
 
@@ -135,6 +146,8 @@ scan_brapi_endpoints <- function(programDbId = 0, trialDbId = 0, studyDbId = 0) 
     stop("No server has been defined yet! You have to set your server configurations first using the `set_qbms_config()` function")
   }
 
+  # need to improve this functionality using the BrAPI /brapi/v2/serverinfo endpoint response
+  
   call_url <- paste0(
     qbms_globals$config$base_url,
     ifelse(qbms_globals$config$crop == "", "", paste0("/", qbms_globals$config$crop)),
@@ -157,12 +170,10 @@ scan_brapi_endpoints <- function(programDbId = 0, trialDbId = 0, studyDbId = 0) 
   scan_result <- sapply(call_url, function(url) {
     # Create the request
     req <- httr2::request(url)
-    req <- httr2::req_headers(req, .headers = brapi_headers())
-
-    if (!is.na(qbms_globals$state$token)) {
-      req <- httr2::req_auth_bearer_token(req, qbms_globals$state$token)
-    }
-
+    req <- httr2::req_headers(req, "accept" = "application/json")
+    req <- httr2::req_headers(req, "Accept-Encoding" = "gzip, deflate")
+    req <- httr2::req_headers(req, "Authorization" = paste0("Bearer ", qbms_globals$state$token))
+    
     # Perform the request
     resp <- tryCatch(
       httr2::req_perform(req),
@@ -203,7 +214,7 @@ qbms_globals$state  <- list(token = NULL)
 #' An environment object that holds the current QBMS configuration and state.
 #'
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #'
 #' @examples
 #' if (interactive()) {
@@ -230,7 +241,7 @@ debug_qbms <- function() {
 #' A list containing the current QBMS configuration and state.
 #'
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #'
 #' @seealso \code{\link{set_qbms_connection}}
 #'
@@ -274,7 +285,7 @@ get_qbms_connection <- function() {
 #' @param env A list containing the saved connection configuration and state.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #'
 #' @seealso \code{\link{get_qbms_connection}}
 #'
@@ -330,12 +341,12 @@ set_qbms_connection <- function(env) {
 #' @param page_size The number of records per page when making API calls (default is 1000).
 #' @param time_out The maximum number of seconds to wait for a response (default is 120).
 #' @param no_auth Logical, whether the server requires authentication (default is FALSE).
-#' @param engine The backend system (default is "bms"). Options include "bms", "gigwa", "breedbase", "ebs".
+#' @param engine The backend system (default is "bms"). Options include "bms", "gigwa", "breedbase", "ebs", "germinate".
 #' @param brapi_ver The version of BrAPI to use, either "v1" or "v2" (default is "v1").
 #' @param verbose Logical, indicating whether to display progress information when making API calls (default is TRUE).
 #'
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #'
 #' @return
 #' No return value.
@@ -352,8 +363,9 @@ set_qbms_config <- function(url = "http://localhost",
   if (is.null(path)) {
     if (engine == "bms") { path = "bmsapi" }
     if (engine == "breedbase") { path = "" }
-    if (engine == "gigwa") { path = "gigwa/rest"; brapi_ver = "v2"}
-    if (engine == "ebs") { path = "" }
+    if (engine == "gigwa") { path = paste0(sub("^https?://[^/]+/([^/]+).*", "\\1", url), "/rest"); brapi_ver = "v2"}
+    if (engine == "ebs") { path = ""; brapi_ver = "v2" }
+    if (engine == "germinate") { path = sub("^https?://[^/]+/?", "", sub("(/#.*|/*$)", "/api", url)); brapi_ver = "v2"}
   }
   
   qbms_globals$config <- list(crop = "")
@@ -365,7 +377,7 @@ set_qbms_config <- function(url = "http://localhost",
   qbms_globals$config$path      <- path
   qbms_globals$config$page_size <- page_size
   qbms_globals$config$time_out  <- time_out
-  qbms_globals$config$base_url  <- paste0(qbms_globals$config$server, ifelse(path == "", "", paste0("/", path)))
+  qbms_globals$config$base_url  <- paste0(qbms_globals$config$server, ifelse(path == "", "", ifelse(substr(path, 1, 1) == "/", path, paste0("/", path))))
   qbms_globals$config$engine    <- engine
   qbms_globals$config$brapi_ver <- brapi_ver
   qbms_globals$config$verbose   <- verbose

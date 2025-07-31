@@ -16,9 +16,21 @@ No return value. The access token is stored internally for future use.
 }
 \description{
 Logs in to the BreedBase server using a username and password. If credentials are not provided,
-a pop-up window will prompt the user. The function is a wrapper around the `login_bms()` function,
-with encoding set to `form`.
+a pop-up window will prompt the user. The function is a wrapper around the \code{login_bms()} function,
+with encoding set to \code{form}.
+}
+\examples{
+if(interactive()) {
+  set_qbms_config("https://cassavabase.org/", engine = "breedbase")
+  
+  # Login using your BreedBase account (interactive mode)
+  login_breedbase()
+  
+   # You can pass BreedBase username and password as parameters (batch mode)
+   # login_breedbase("username", "password")
+}
+
 }
 \author{
-Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 }

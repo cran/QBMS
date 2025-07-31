@@ -10,10 +10,10 @@
 #' A character vector containing the names of supported crops.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso
-#' \code{\link{login_bms}}, \code{\link{set_crop}} to configure and set the current active crop.
+#' \code{\link{login}}, \code{\link{set_crop}} to configure and set the current active crop.
 #'
 #' @examples
 #' if (interactive()) {
@@ -34,7 +34,7 @@ list_crops <- function() {
   } else {
     call_url  <- get_brapi_url("list_crops")
 
-    bms_crops <- brapi_get_call(call_url)$data
+    bms_crops <- brapi_get_call(call_url, caller_func = "list_crops")$data
 
     qbms_globals$state$crops <- bms_crops
   }
@@ -55,10 +55,10 @@ list_crops <- function() {
 #' No return value. The function updates the global state with the selected crop.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso
-#' \code{\link{login_bms}}, \code{\link{list_crops}} to validate and retrieve the list of supported crops.
+#' \code{\link{login}}, \code{\link{list_crops}} to validate and retrieve the list of supported crops.
 #'
 #' @examples
 #' if (interactive()) {
@@ -96,10 +96,10 @@ set_crop <- function(crop_name) {
 #' A data frame containing the names of breeding programs available for the active crop.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso
-#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{list_crops}} for managing server connection and crop selection.
+#' \code{\link{login}}, \code{\link{set_crop}}, \code{\link{list_crops}} for managing server connection and crop selection.
 #'
 #' @examples
 #' if (interactive()) {
@@ -112,10 +112,6 @@ set_crop <- function(crop_name) {
 #' @export
 
 list_programs <- function() {
-  if (is.null(qbms_globals$state$token)) {
-    stop("No server has been connected yet! You have to connect a server first using the `login_bms()` function")
-  }
-
   if (is.null(qbms_globals$config$crop)) {
     stop("No crop has been selected yet! You have to set your crop first using the `set_crop()` function")
   }
@@ -123,14 +119,9 @@ list_programs <- function() {
   if (is.null(qbms_globals$state$programs)) {
     call_url <- get_brapi_url("list_programs")
 
-    results <- brapi_get_call(call_url)$data
-    
-    if (qbms_globals$config$engine == "bms") {
-      bms_programs <- results[c("name")]
-      colnames(bms_programs) <- c("programName")
-    } else {
-      bms_programs <- results[c("programName")]
-    }
+    results <- brapi_get_call(call_url, caller_func = "list_programs")$data
+
+    bms_programs <- results[c("programName")]
 
     qbms_globals$state$programs <- cbind(bms_programs, results[c("programDbId")])
   }
@@ -152,10 +143,10 @@ list_programs <- function() {
 #' No return value. The internal state is updated with the selected program.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso
-#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{list_programs}} for related operations in the crop and program selection process.
+#' \code{\link{login}}, \code{\link{set_crop}}, \code{\link{list_programs}} for related operations in the crop and program selection process.
 #'
 #' @examples
 #' if (interactive()) {
@@ -193,10 +184,10 @@ set_program <- function(program_name) {
 #' A data frame containing information on trials for the active breeding program.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso
-#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{list_trials}}
+#' \code{\link{login}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{list_trials}}
 
 get_program_trials <- function() {
   if (!is.null(qbms_globals$state$trials)) {
@@ -205,7 +196,7 @@ get_program_trials <- function() {
     call_url <- get_brapi_url("get_program_trials")
     call_url <- sub("\\{programDbId\\}", qbms_globals$state$program_db_id, call_url)
     
-    bms_program_trials <- brapi_get_call(call_url, FALSE)$data
+    bms_program_trials <- brapi_get_call(call_url, FALSE, caller_func = "get_program_trials")$data
     
     qbms_globals$state$trials <- bms_program_trials
   }
@@ -231,10 +222,10 @@ get_program_trials <- function() {
 #' The year filter is only supported for BMS databases.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso
-#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}} for related operations involving crop and program selection.
+#' \code{\link{login}}, \code{\link{set_crop}}, \code{\link{set_program}} for related operations involving crop and program selection.
 #'
 #' @examples
 #' if (interactive()) {
@@ -296,10 +287,10 @@ list_trials <- function(year = NULL) {
 #' No return value. The internal state is updated with the selected trial.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso
-#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{list_trials}} for operations involving crops, programs, and trials.
+#' \code{\link{login}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{list_trials}} for operations involving crops, programs, and trials.
 #'
 #' @examples
 #' if (interactive()) {
@@ -343,10 +334,10 @@ set_trial <- function(trial_name) {
 #' This function must be called after a trial has been set using \code{\link{set_trial}}.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso
-#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}} for related operations on crops, programs, and trials.
+#' \code{\link{login}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}} for related operations on crops, programs, and trials.
 #'
 #' @examples
 #' if (interactive()) {
@@ -371,24 +362,13 @@ list_studies <- function() {
     call_url <- get_brapi_url("list_studies")
     call_url <- sub("\\{trialDbId\\}", qbms_globals$state$trial_db_id, call_url)
     
-    # handle the case of BreedBase trials (studies) listed in the root program folder (trial)
-    if (qbms_globals$config$engine == "breedbase" && qbms_globals$state$trial_db_id == qbms_globals$state$program_db_id) {
-      call_url <- sub("\\?trialDbId\\=", '?programDbId=', call_url)
-    }
-
-    bms_trial_studies <- brapi_get_call(call_url, FALSE)$data
+    trial_studies <- brapi_get_call(call_url, FALSE, caller_func = "list_studies")$data
     
-    # handle the case of BreedBase trials (studies) listed in the root program folder (trial)
-    if (qbms_globals$config$engine == "breedbase" && qbms_globals$state$trial_db_id == qbms_globals$state$program_db_id) {
-      bms_trial_studies <- bms_trial_studies[is.na(bms_trial_studies$trialName), ]
-      rownames(bms_trial_studies) <- NULL
-    }
-    
-    if (nrow(bms_trial_studies) == 0) {
+    if (nrow(trial_studies) == 0) {
       stop("No studies in the selected trial! Please check what you have set in the `set_trial()` function")
     }
     
-    studies <- bms_trial_studies[, c("studyName", "locationName", "studyDbId")]
+    studies <- trial_studies[, c("studyName", "locationName", "studyDbId")]
 
     qbms_globals$state$studies <- studies
   }
@@ -409,10 +389,10 @@ list_studies <- function() {
 #' No return value. The internal state is updated with the selected study.
 #'  
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso
-#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}}, \code{\link{list_studies}} for related operations on crops, programs, trials, and studies.
+#' \code{\link{login}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}}, \code{\link{list_studies}} for related operations on crops, programs, trials, and studies.
 #'
 #' @examples
 #' if (interactive()) {
@@ -451,10 +431,10 @@ set_study <- function(study_name) {
 #' if no study metadata is available.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso
-#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, 
+#' \code{\link{login}}, \code{\link{set_crop}}, \code{\link{set_program}}, 
 #' \code{\link{set_trial}}, \code{\link{set_study}} for related crop and study management.
 #'
 #' @examples
@@ -478,7 +458,7 @@ get_study_info <- function() {
   call_url <- get_brapi_url("get_study_info")
   call_url <- sub("\\{studyDbId\\}", qbms_globals$state$study_db_id, call_url)
 
-  study_info <- brapi_get_call(call_url)
+  study_info <- brapi_get_call(call_url, caller_func = "get_study_info")
   
   if (is.null(study_info)) {
     study_info_df <- NULL
@@ -501,10 +481,10 @@ get_study_info <- function() {
 #' if no data is available.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso
-#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, 
+#' \code{\link{login}}, \code{\link{set_crop}}, \code{\link{set_program}}, 
 #' \code{\link{set_trial}}, \code{\link{set_study}} for related study operations.
 #'
 #' @examples
@@ -529,7 +509,7 @@ get_study_data <- function() {
   call_url <- get_brapi_url("get_study_data")
   call_url <- sub("\\{studyDbId\\}", qbms_globals$state$study_db_id, call_url)
 
-  study_result <- brapi_get_call(call_url)
+  study_result <- brapi_get_call(call_url, caller_func = "get_study_data")
   
   if (qbms_globals$config$brapi_ver == "v1") {
     qbms_globals$state$observationVariableDbIds <- study_result$observationVariableDbIds
@@ -539,11 +519,7 @@ get_study_data <- function() {
   
   study_data   <- as.data.frame(study_result$data)
   
-  if (qbms_globals$config$engine == "breedbase") {
-    study_header <- study_data[1, ]
-    study_data   <- study_data[-1, ]
-    
-  } else if (qbms_globals$config$brapi_ver == "v1") {
+  if (qbms_globals$config$brapi_ver == "v1") {
     study_header <- c(study_result$headerRow, 
                       study_result$observationVariableNames)
     
@@ -572,10 +548,10 @@ get_study_data <- function() {
 #' A data frame containing the germplasm list for the active study.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso
-#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, 
+#' \code{\link{login}}, \code{\link{set_crop}}, \code{\link{set_program}}, 
 #' \code{\link{set_trial}}, \code{\link{set_study}} for related operations on crops and studies.
 #'
 #' @examples
@@ -604,23 +580,8 @@ get_germplasm_list <- function() {
   call_url <- get_brapi_url("get_germplasm_list")
   call_url <- sub("\\{studyDbId\\}", qbms_globals$state$study_db_id, call_url)
 
-  germplasm_list <- brapi_get_call(call_url, nested = FALSE)$data
+  germplasm_list <- brapi_get_call(call_url, nested = FALSE, caller_func = "get_germplasm_list")$data
 
-  if (qbms_globals$config$engine == "ebs") {
-    germplasm_list$check <- 0
-    
-    nested_lists <- c("synonyms", "donors", "externalReferences", "germplasmOrigin",
-                      "storageTypes", "taxonIds", "documentationURL", "additionalInfo")
-
-    germplasm_list[, nested_lists] <- NULL
-    germplasm_list <- germplasm_list[, colSums(is.na(germplasm_list)) != nrow(germplasm_list)]
-  }
-  
-  if (qbms_globals$config$engine == "breedbase") {
-    germplasm_list$check <- NA
-    germplasm_list[, c("synonyms")] <- list(NULL)
-  }
-  
   if (nrow(germplasm_list) > 0 & qbms_globals$config$engine == "bms") {
     # BMS POST /crops/{cropName}/programs/{programUUID}/studies/{studyId}/entries to extract entry type (test or check)
     call_url <- paste0(qbms_globals$config$base_url, "/crops/", qbms_globals$config$crop,
@@ -659,10 +620,10 @@ get_germplasm_list <- function() {
 #' A data frame containing the combined observations data from all studies in the active trial.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso
-#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}}
+#' \code{\link{login}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}}
 #'
 #' @examples
 #' if (interactive()) {
@@ -706,10 +667,10 @@ get_trial_data <- function() {
 #' variables used in the current trial.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso
-#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}}, 
+#' \code{\link{login}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}}, 
 #' \code{\link{get_study_data}} for retrieving study observations.
 #'
 #' @examples
@@ -735,7 +696,7 @@ get_trial_obs_ontology <- function() {
     call_url <- get_brapi_url("get_trial_obs_ontology")
     
     if (qbms_globals$config$brapi_ver == "v1") {
-      ontology <- brapi_get_call(call_url)$data
+      ontology <- brapi_get_call(call_url, caller_func = "get_trial_obs_ontology")$data
       
       ontology <- ontology[ontology$observationVariableDbId %in% qbms_globals$state$observationVariableDbIds, ]
 
@@ -767,10 +728,10 @@ get_trial_obs_ontology <- function() {
 #' A data frame containing information about locations relevant to the current crop.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso
-#' \code{\link{login_bms}}, \code{\link{set_crop}} for related crop operations.
+#' \code{\link{login}}, \code{\link{set_crop}} for related crop operations.
 
 list_locations <- function() {
   if (is.null(qbms_globals$config$crop)) {
@@ -782,7 +743,7 @@ list_locations <- function() {
   } else {
     call_url <- get_brapi_url("list_locations")
 
-    location_list <- brapi_get_call(call_url, FALSE)$data
+    location_list <- brapi_get_call(call_url, FALSE, caller_func = "list_locations")$data
 
     qbms_globals$state$locations <- location_list
   }
@@ -803,10 +764,10 @@ list_locations <- function() {
 #' including trial names, study names, location information, and entry counts.
 #' 
 #' @author
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #'
 #' @seealso
-#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{set_program}}
+#' \code{\link{login}}, \code{\link{set_crop}}, \code{\link{set_program}}
 #'
 #' @examples
 #' if (interactive()) {
@@ -899,7 +860,7 @@ get_program_studies <- function() {
 #' A string representing the germplasm's unique ID (germplasmDbId).
 #' 
 #' @author 
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso 
 #' \code{\link{set_crop}}, \code{\link{get_germplasm_data}}, \code{\link{get_germplasm_attributes}}
@@ -917,7 +878,7 @@ get_germplasm_id <- function(germplasm_name = "") {
   call_url <- sub("\\{germplasmName\\}", germplasm_name, call_url)
 
   # this BrAPI call return all germplasm records start with the given name NOT exactly match!
-  results <- brapi_get_call(call_url, FALSE)$data
+  results <- brapi_get_call(call_url, FALSE, caller_func = "get_germplasm_id")$data
   
   if (length(results) == 0) {
     stop("No germplasm in this crop database start with your filtering name!")
@@ -945,10 +906,10 @@ get_germplasm_id <- function(germplasm_name = "") {
 #' A data frame containing all available observations data for the specified germplasm.
 #' 
 #' @author 
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso 
-#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{get_germplasm_attributes}}
+#' \code{\link{login}}, \code{\link{set_crop}}, \code{\link{get_germplasm_attributes}}
 #' 
 #' @examples
 #' if (interactive()) {
@@ -1042,7 +1003,7 @@ get_germplasm_data <- function(germplasm_name = "") {
 #' Johan Steven Aparicio, \email{j.aparicio@cgiar.org}
 #' 
 #' @seealso 
-#' \code{\link{login_bms}}, \code{\link{set_crop}}, \code{\link{get_germplasm_data}}
+#' \code{\link{login}}, \code{\link{set_crop}}, \code{\link{get_germplasm_data}}
 #' 
 #' @examples
 #' if (interactive()) {
@@ -1062,7 +1023,78 @@ get_germplasm_attributes <- function(germplasm_name = "") {
   call_url <- get_brapi_url("get_germplasm_attributes")
   call_url <- sub("\\{germplasmDbId\\}", germplasm_db_id, call_url)
   
-  results <- brapi_get_call(call_url)$data
+  results <- brapi_get_call(call_url, caller_func = "get_germplasm_attributes")$data
 
   return(results)
+}
+
+
+#' Get the Pedigree table for the Selected Trial
+#'
+#' @description
+#' Get the pedigree table representing the pedigree tree for the currently active 
+#' trial. Each row corresponds to a germplasm entry and includes identifiers and 
+#' details for both parents.
+#' 
+#' @return 
+#' A data frame with germplasm and parent details for the selected trial.
+#' 
+#' @author 
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
+#' 
+#' @seealso 
+#' \code{\link{login}}, \code{\link{set_crop}}, \code{\link{set_program}}, \code{\link{set_trial}} for related operations on crops, programs, and trials.
+#' 
+#' @export
+
+get_trial_pedigree <- function() {
+  if (is.null(qbms_globals$state$trial_db_id)) {
+    stop("No trial has been selected yet! You have to set your trial first using the `set_trial()` function")
+  }
+  
+  if (!is.null(qbms_globals$state$pedigree)) {
+    pedigree <- qbms_globals$state$pedigree
+  } else {
+    call_url <- get_brapi_url("get_trial_pedigree")
+    call_url <- sub("\\{trialDbId\\}", qbms_globals$state$trial_db_id, call_url)
+    
+    # BrAPI v1.3 pedigree endpoint
+    # /germplasm/{germplasmDbId}/pedigree
+    # https://app.swaggerhub.com/apis/PlantBreedingAPI/BrAPI/1.3#/Germplasm/get_germplasm__germplasmDbId__pedigree
+    
+    pedigree <- brapi_get_call(call_url, FALSE, caller_func = "get_trial_pedigree")$data
+    
+    if (nrow(pedigree) == 0) {
+      stop("No pedigree data in the selected trial! Please check what you have set in the `set_trial()` function")
+    }
+    
+    # flatten pedigree table
+    pedigree <- do.call(rbind, lapply(seq_len(nrow(pedigree)), function(i) {
+      # get parents information
+      parents <- pedigree$parents[[i]]
+      
+      # ensure exactly 2 parents exist
+      if (is.null(parents) || nrow(parents) != 2) return(NULL)
+      
+      # create one row with germplasm info and both parents flattened
+      data.frame(
+        germplasmDbId = pedigree$germplasmDbId[i],
+        germplasmName = pedigree$germplasmName[i],
+        
+        parent1DbId = parents$germplasmDbId[1],
+        parent1Name = parents$germplasmName[1],
+        parent1Type = parents$parentType[1],
+        
+        parent2DbId = parents$germplasmDbId[2],
+        parent2Name = parents$germplasmName[2],
+        parent2Type = parents$parentType[2],
+        
+        stringsAsFactors = FALSE
+      )
+    }))
+
+    qbms_globals$state$pedigree <- pedigree
+  }
+  
+  return(pedigree)
 }

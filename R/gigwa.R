@@ -1,61 +1,5 @@
 ### GIGWA ######################################################################
 
-#' Login to the GIGWA Server
-#'
-#' @description
-#' Connect to the GIGWA server. If the `username` or `password` parameters are missing,
-#' a login window will be triggered to capture these details.
-#'
-#' All connection settings (server URL, port, API path, and protocol) are read from the
-#' `qbms_config` list. The function will request an authentication token from the server
-#' and update the `qbms_state` list with the token.
-#'
-#' @param username The GIGWA username (optional, default is NULL).
-#' @param password The GIGWA password (optional, default is NULL).
-#' 
-#' @return 
-#' No return value. The authentication token will be stored internally.
-#' 
-#' @author 
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
-#' 
-#' @examples
-#' if (interactive()) {
-#'   set_qbms_config("http://localhost:59395/gigwa/index.jsp", time_out = 300, engine = "gigwa")
-#'
-#'   # Login using your GIGWA account (interactive mode)
-#'   login_gigwa()
-#'   
-#'   # You can pass GIGWA username and password as parameters (batch mode)
-#'   # login_gigwa("gigwadmin", "nimda")
-#' }
-#' @export
-
-login_gigwa <- function(username = NULL, password = NULL) {
-  if (is.null(username) || is.null(password)) {
-    credentials <- get_login_details()
-  } else {
-    credentials <- c(usr = username, pwd = password)
-  }
-  
-  call_url  <- paste0(qbms_globals$config$base_url, "/gigwa/generateToken")
-  call_body <- list(username = credentials["usr"], password = credentials["pwd"])
-  
-  req <- httr2::request(utils::URLencode(call_url))
-  req <- httr2::req_body_json(req, call_body)
-  req <- httr2::req_timeout(req, qbms_globals$config$time_out)
-  
-  resp <- httr2::req_perform(req)
-  
-  if (httr2::resp_status(resp) == 403 || credentials["usr"] == "" || credentials["pwd"] == "") {
-    stop("403 Forbidden")
-  }
-  
-  content <- httr2::resp_body_json(resp)
-  
-  set_token(content$token)
-}
-
 
 #' List GIGWA Databases
 #' 
@@ -67,7 +11,7 @@ login_gigwa <- function(username = NULL, password = NULL) {
 #' A list of databases available on the connected GIGWA server.
 #' 
 #' @author 
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso 
 #' \code{\link{set_qbms_config}}
@@ -87,7 +31,7 @@ gigwa_list_dbs <- function() {
   
   call_url <- get_brapi_url("gigwa_list_dbs")
   
-  gigwa_dbs <- brapi_get_call(call_url)$data
+  gigwa_dbs <- brapi_get_call(call_url, caller_func = "gigwa_list_dbs")$data
   
   return(gigwa_dbs)
 }
@@ -105,7 +49,7 @@ gigwa_list_dbs <- function() {
 #' No return value. Updates the internal configuration with the selected database.
 #' 
 #' @author 
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso 
 #' \code{\link{set_qbms_config}}, \code{\link{gigwa_list_dbs}}
@@ -125,9 +69,9 @@ gigwa_set_db <- function(db_name) {
     stop("Your database name is not exists in this connected GIGWA server! You may use the `gigwa_list_dbs()` function to check the available databases")
   }
   
-  qbms_globals$config$db <- db_name
+  qbms_globals$state$program_db_id <- db_name
   
-  qbms_globals$state$gigwa_projects <- NULL
+  qbms_globals$state$studies <- NULL
 }
 
 
@@ -135,13 +79,13 @@ gigwa_set_db <- function(db_name) {
 #'
 #' @description
 #' Retrieve the list of projects available in the currently active GIGWA database, set
-#' using `gigwa_set_db()`. If no database is selected, the function will throw an error.
+#' using \code{gigwa_set_db()}. If no database is selected, the function will throw an error.
 #'
 #' @return 
 #' A list of project names in the selected database.
 #' 
 #' @author 
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso 
 #' \code{\link{set_qbms_config}}, \code{\link{gigwa_set_db}}
@@ -160,24 +104,24 @@ gigwa_list_projects <- function() {
     stop("No server has been connected yet! You have to connect a GIGWA server first using the `login_gigwa()` function")
   }
   
-  if (is.null(qbms_globals$config$db)) {
+  if (is.null(qbms_globals$state$program_db_id)) {
     stop("No database has been selected yet! You have to set your database first using the `gigwa_set_db()` function")
   }
   
-  if (!is.null(qbms_globals$state$gigwa_projects)) {
-    gigwa_projects <- qbms_globals$state$gigwa_projects
+  if (!is.null(qbms_globals$state$studies)) {
+    studies <- qbms_globals$state$studies
   } else {
     call_url <- get_brapi_url("gigwa_list_projects")
-    call_url <- sub("\\{programDbId\\}", qbms_globals$config$db, call_url)
+    call_url <- sub("\\{programDbId\\}", qbms_globals$state$program_db_id, call_url)
     
-    gigwa_projects <- brapi_get_call(call_url)$data
+    studies <- brapi_get_call(call_url, caller_func = "gigwa_list_projects")$data
     
-    gigwa_projects <- gigwa_projects[, c("studyName", "studyDbId")]
+    studies <- studies[, c("studyName", "studyDbId")]
     
-    qbms_globals$state$gigwa_projects <- gigwa_projects
+    qbms_globals$state$studies <- studies
   }
   
-  return(gigwa_projects[c("studyName")])
+  return(studies[c("studyName")])
 }
 
 
@@ -193,7 +137,7 @@ gigwa_list_projects <- function() {
 #' No return value. Updates the internal state with the selected project.
 #' 
 #' @author 
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso 
 #' \code{\link{set_qbms_config}}, \code{\link{gigwa_set_db}}, \code{\link{gigwa_list_projects}}
@@ -214,15 +158,15 @@ gigwa_set_project <- function(project_name) {
     stop("Your project name is not exists in this database! You may use the `gigwa_list_projects()` function to check the available projects")
   }
   
-  gigwa_projects <- qbms_globals$state$gigwa_projects
+  studies <- qbms_globals$state$studies
   
-  project_row <- which(gigwa_projects$studyName == project_name)
+  project_row <- which(studies$studyName == project_name)
   
-  qbms_globals$state$study_db_id <- gigwa_projects[project_row, "studyDbId"]
+  qbms_globals$state$study_db_id <- studies[project_row, "studyDbId"]
   
-  qbms_globals$state$gigwa_runs      <- NULL
-  qbms_globals$state$gigwa_samples   <- NULL
-  qbms_globals$state$gigwa_sequences <- NULL
+  qbms_globals$state$variant_sets <- NULL
+  qbms_globals$state$samples      <- NULL
+  qbms_globals$state$references   <- NULL
 }
 
 
@@ -230,13 +174,13 @@ gigwa_set_project <- function(project_name) {
 #'
 #' @description
 #' Retrieve the list of available runs in the currently active GIGWA project, set using
-#' `gigwa_set_project()`. If no project is selected, an error will be raised.
+#' \code{gigwa_set_project()}. If no project is selected, an error will be raised.
 #'
 #' @return 
 #' A list of run names associated with the selected project.
 #' 
 #' @author 
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso 
 #' \code{\link{set_qbms_config}}, \code{\link{gigwa_set_project}}
@@ -256,20 +200,20 @@ gigwa_list_runs <- function() {
     stop("No project has been selected yet! You have to set your project first using the `gigwa_set_project()` function")
   }
   
-  if (!is.null(qbms_globals$state$gigwa_runs)) {
-    gigwa_runs <- qbms_globals$state$gigwa_runs
+  if (!is.null(qbms_globals$state$variant_sets)) {
+    variant_sets <- qbms_globals$state$variant_sets
   } else {
     call_url  <- get_brapi_url("gigwa_list_runs")
     call_body <- paste0('{"studyDbIds": ["', qbms_globals$state$study_db_id, '"]}')
     
     results <- brapi_post_search_call(call_url, call_body, FALSE)
     
-    gigwa_runs <- as.data.frame(results$result$data[, c("variantSetName", "variantSetDbId")])
+    variant_sets <- as.data.frame(results$result$data[, c("variantSetName", "variantSetDbId")])
     
-    qbms_globals$state$gigwa_runs <- gigwa_runs
+    qbms_globals$state$variant_sets <- variant_sets
   }
   
-  return(gigwa_runs[c("variantSetName")])
+  return(variant_sets[c("variantSetName")])
 }
 
 
@@ -285,7 +229,7 @@ gigwa_list_runs <- function() {
 #' No return value. Updates the internal state with the selected run.
 #' 
 #' @author 
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso 
 #' \code{\link{set_qbms_config}}, \code{\link{gigwa_set_project}}, \code{\link{gigwa_list_runs}}
@@ -307,9 +251,9 @@ gigwa_set_run <- function(run_name) {
     stop("Your run name is not exists in this project! You may use the `gigwa_list_runs()` function to check the available runs")
   }
   
-  gigwa_runs <- qbms_globals$state$gigwa_runs
+  variant_sets <- qbms_globals$state$variant_sets
   
-  qbms_globals$state$variant_set_db_id <- gigwa_runs[gigwa_runs$variantSetName == run_name, "variantSetDbId"]
+  qbms_globals$state$variant_set_db_id <- variant_sets[variant_sets$variantSetName == run_name, "variantSetDbId"]
 }
 
 
@@ -317,13 +261,13 @@ gigwa_set_run <- function(run_name) {
 #'
 #' @description
 #' Retrieve the list of samples associated with the currently active GIGWA project,
-#' set using `gigwa_set_project()`.
+#' set using \code{gigwa_set_project()}.
 #'
 #' @return 
 #' A vector of sample names in the selected project.
 #' 
 #' @author 
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso 
 #' \code{\link{set_qbms_config}}, \code{\link{gigwa_set_project}}
@@ -343,20 +287,20 @@ gigwa_get_samples <- function() {
     stop("No project has been selected yet! You have to set your project first using the `gigwa_set_project()` function")
   }
   
-  if (!is.null(qbms_globals$state$gigwa_samples)) {
-    gigwa_samples <- qbms_globals$state$gigwa_samples
+  if (!is.null(qbms_globals$state$samples)) {
+    samples <- qbms_globals$state$samples
   } else {
     call_url  <- get_brapi_url("gigwa_get_samples")
     call_body <- paste0('{"studyDbIds": ["', qbms_globals$state$study_db_id, '"]}')
     
     results <- brapi_post_search_call(call_url, call_body, FALSE)
     
-    gigwa_samples <- results$result$data[, c("sampleDbId", "germplasmDbId")]
+    samples <- results$result$data[, c("sampleDbId", "germplasmDbId")]
     
-    qbms_globals$state$gigwa_samples <- gigwa_samples
+    qbms_globals$state$samples <- samples
   }
 
-  germplasmName <- sub(".*\u00A7", "", gigwa_samples$germplasmDbId)
+  germplasmName <- sub(".*\u00A7", "", samples$germplasmDbId)
   
   return(germplasmName)
 }
@@ -372,7 +316,7 @@ gigwa_get_samples <- function() {
 #' A vector of sequence names (e.g., chromosome names) for the selected project.
 #' 
 #' @author 
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso 
 #' \code{\link{set_qbms_config}}, \code{\link{gigwa_set_project}}
@@ -392,20 +336,20 @@ gigwa_get_sequences <- function() {
     stop("No project has been selected yet! You have to set your project first using the `gigwa_set_project()` function")
   }
   
-  if (!is.null(qbms_globals$state$gigwa_sequences)) {
-    gigwa_sequences <- qbms_globals$state$gigwa_sequences
+  if (!is.null(qbms_globals$state$references)) {
+    references <- qbms_globals$state$references
   } else {
     call_url  <- get_brapi_url("gigwa_get_sequences")
     call_body <- paste0('{"studyDbIds": ["', qbms_globals$state$study_db_id, '"]}')
     
     results <- brapi_post_search_call(call_url, call_body, FALSE)
     
-    gigwa_sequences <- results$result$data$referenceName
+    references <- results$result$data$referenceName
     
-    qbms_globals$state$gigwa_sequences <- gigwa_sequences
+    qbms_globals$state$references <- references
   }
   
-  return(gigwa_sequences)
+  return(references)
 }
 
 
@@ -427,7 +371,7 @@ gigwa_get_sequences <- function() {
 #' and subsequent columns contain numerical genotyping information (0 for reference allele, 1 for heterozygous, and 2 for minor allele).
 #' 
 #' @author 
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @examples
 #' if (interactive()) {
@@ -615,7 +559,7 @@ gigwa_get_variants <- function(max_missing = 1, min_maf = 0.5, samples = NULL, s
 #' Values are numeric codings (0: reference allele, 1: heterozygous, 2: alternative allele).
 #' 
 #' @author 
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @examples
 #' if (interactive()) {
@@ -645,11 +589,11 @@ gigwa_get_allelematrix <- function(samples = NULL, start = 0, end = "", chrom = 
   }
   
   germplasmNames <- samples
-  germplasmDbIds <- paste0('"', paste0(paste0(qbms_globals$config$db, "\u00A7", germplasmNames), collapse = '","'), '"')
+  germplasmDbIds <- paste0('"', paste0(paste0(qbms_globals$state$program_db_id, "\u00A7", germplasmNames), collapse = '","'), '"')
   
   if (!is.null(snps)) {
     variantNames <- snps
-    variantDbIds <- paste0('"', paste0(paste0(qbms_globals$config$db, "\u00A7", variantNames), collapse = '","'), '"')
+    variantDbIds <- paste0('"', paste0(paste0(qbms_globals$state$program_db_id, "\u00A7", variantNames), collapse = '","'), '"')
   }
   
   if (is.null(chrom)) {
@@ -756,10 +700,10 @@ gigwa_get_allelematrix <- function(samples = NULL, start = 0, end = "", chrom = 
     geno_data <- geno_data + 1
   }
   
-  temp <- merge(resultCallSetDbIds, qbms_globals$state$gigwa_samples, by.x = 1, by.y = "sampleDbId", sort = FALSE)
+  temp <- merge(resultCallSetDbIds, qbms_globals$state$samples, by.x = 1, by.y = "sampleDbId", sort = FALSE)
 
   colnames(geno_data) <- sub(".*\u00A7", "", temp$germplasmDbId)
-  rownames(geno_data) <- sub(paste0(qbms_globals$config$db, "\u00A7"), "", resultVariantNames)
+  rownames(geno_data) <- sub(paste0(qbms_globals$state$program_db_id, "\u00A7"), "", resultVariantNames)
   
   return(geno_data)
 }
@@ -780,7 +724,7 @@ gigwa_get_allelematrix <- function(samples = NULL, start = 0, end = "", chrom = 
 #' A data frame of SNP markers, optionally simplified to include rs#, alleles, chromosome, and position.
 #' 
 #' @author 
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @examples
 #' if (interactive()) {
@@ -826,7 +770,7 @@ gigwa_get_markers <- function(start = NULL, end = NULL, chrom = NULL, simplify =
     colnames(geno_map) <- c("rs#", "alleles", "chrom", "pos")
     rownames(geno_map) <- NULL
   }
-  
+
   return(geno_map)
 }
 
@@ -834,14 +778,15 @@ gigwa_get_markers <- function(start = NULL, end = NULL, chrom = NULL, simplify =
 #' Get the Metadata of the Current Active GIGWA Run
 #'
 #' @description
-#' Retrieve metadata associated with the samples in the current active run, set using the `gigwa_set_run()` function.
-#' The metadata provides additional information about the samples in the selected run.
+#' Retrieve metadata associated with the samples in the current active run, set 
+#' using the \code{gigwa_set_run()} function. The metadata provides additional 
+#' information about the samples in the selected run.
 #'
 #' @return 
 #' A data frame containing metadata attributes for each sample in the active run.
 #'  
 #' @author 
-#' Khaled Al-Shamaa, \email{k.el-shamaa@cgiar.org}
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
 #' 
 #' @seealso 
 #' \code{\link{set_qbms_config}}, \code{\link{gigwa_set_run}}
@@ -863,7 +808,7 @@ gigwa_get_metadata <- function() {
   }
   
   gigwa_get_samples()
-  germplasmDbIds <- paste(qbms_globals$state$gigwa_samples$germplasmDbId, collapse = '","')
+  germplasmDbIds <- paste(qbms_globals$state$samples$germplasmDbId, collapse = '","')
   
   call_url  <- get_brapi_url("gigwa_get_metadata")
   call_body <- paste0('{"germplasmDbIds": ["', germplasmDbIds, '"]}')
@@ -874,4 +819,245 @@ gigwa_get_metadata <- function() {
   colnames(metadata) <- gsub("value\\.", "", colnames(metadata))
   
   return(metadata)
+}
+
+
+#' List Variant Sets in the Selected Study
+#'
+#' @description
+#' Retrieves the names of all variant sets available in the currently selected 
+#' study, as set by \code{set_study()}. If no study is selected, the function returns 
+#' an error.
+#'
+#' @return 
+#' A list of the names of variant sets associated with the selected study.
+#' 
+#' @author 
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
+#' 
+#' @seealso 
+#' \code{\link{set_qbms_config}}, \code{\link{set_study}}
+#' 
+#' @export
+
+list_variantsets <- function() {
+  if (is.null(qbms_globals$state$study_db_id)) {
+    stop("No study has been selected yet! You have to set your study first using the `set_study()` function")
+  }
+  
+  if (!is.null(qbms_globals$state$variant_sets)) {
+    variant_sets <- qbms_globals$state$variant_sets
+  } else {
+    call_url <- get_brapi_url("list_runs")
+    call_url <- sub("\\{programDbId\\}", qbms_globals$state$program_db_id, call_url)
+    call_url <- sub("\\{studyDbId\\}", qbms_globals$state$study_db_id, call_url)
+    
+    variant_sets <- brapi_get_call(call_url, caller_func = "list_variantsets")$data
+    
+    variant_sets <- variant_sets[, c("variantSetName", "variantSetDbId")]
+    
+    qbms_globals$state$variant_sets <- variant_sets
+  }
+  
+  return(variant_sets$variantSetName)
+}
+
+
+#' Set the Active Variant Set
+#'
+#' @description
+#' Selects a variant set by name from the currently active study and updates the 
+#' internal state to make it the active variant set. This selection is required 
+#' for subsequent data retrieval operations related to variant sets.
+#'
+#' @param variantset_name The name of the variant set to be active.
+#' 
+#' @return 
+#' No return value. Updates the internal state with the selected variant set.
+#' 
+#' @author 
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
+#' 
+#' @seealso 
+#' \code{\link{set_qbms_config}}, \code{\link{set_study}}, \code{\link{list_variantsets}}
+#' 
+#' @export
+
+set_variantset <- function(variantset_name) {
+  valid_variantsets <- list_variantsets()
+  
+  if (!variantset_name %in% unlist(valid_variantsets)) {
+    stop("Your variant set name is not exists in this study! You may use the `list_variantsets()` function to check the available variant sets")
+  }
+  
+  variant_sets <- qbms_globals$state$variant_sets
+  
+  qbms_globals$state$variant_set_db_id <- variant_sets[variant_sets$variantSetName == variant_sets, "variantSetDbId"]
+  
+  qbms_globals$state$variantset <- NULL
+}
+
+
+#' Get Marker Matrix from the Selected Variant Set
+#'
+#' @description
+#' Get a two-dimensional marker matrix for all samples in the currently active 
+#' variant set. This function is used as an alternative to the \code{get_variantset()} 
+#' function when the server does not support it.
+#'
+#' Note: This approach is significantly slower than \code{\link{get_variantset}} 
+#' because it fetches data page by page through the BrAPI API, rather than 
+#' downloading the full matrix in one Falpjack format file.
+#'
+#' @author 
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
+#' 
+#' @seealso 
+#' \code{\link{set_qbms_config}}, \code{\link{set_variantset}}
+#' 
+#' @export
+
+get_variants <- function() {
+  if (is.null(qbms_globals$state$variant_set_db_id)) {
+    stop("No variant set has been selected yet! You have to select your variant set first using the `set_variantset()` function")
+  }
+  
+  if (!is.null(qbms_globals$state$variants)) {
+    variants <- qbms_globals$state$variants
+  } else {
+    call_url <- get_brapi_url("get_variants")
+    call_url <- sub("\\{variantSetDbId\\}", qbms_globals$state$variant_set_db_id, call_url)
+
+    variants <- brapi_get_call(call_url, caller_func = "get_variants")$data
+    
+    variants <- with(variants, tapply(genotypeValue, list(variantName, callSetName), function(x) if(length(x)) x else NA))
+
+    qbms_globals$state$variants <- variants
+  }
+  
+  return(variants)
+}
+
+
+#' Get Marker Matrix from the Selected Variant Set
+#'
+#' @description
+#' Downloads a two-dimensional marker matrix for all samples in the currently 
+#' active variant set, using the efficient Flapjack file format from the server. 
+#' Row names correspond to marker IDs and column names correspond to unique 
+#' sample IDs. Genotype calls are returned in character format.
+#'
+#' @return
+#' A data frame of genotype calls in character format, with markers as rows and 
+#' samples as columns.
+#' 
+#' @author 
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
+#' 
+#' @seealso 
+#' \code{\link{set_qbms_config}}, \code{\link{set_variantset}}
+#' 
+#' @export
+
+get_variantset <- function() {
+  if (is.null(qbms_globals$state$variant_set_db_id)) {
+    stop("No variant set has been selected yet! You have to select your variant set first using the `set_variantset()` function")
+  }
+  
+  if (!is.null(qbms_globals$state$variantset)) {
+    variantset <- qbms_globals$state$variantset
+  } else {
+    call_url <- get_brapi_url("get_variant_set")
+    call_url <- sub("\\{variantSetDbId\\}", qbms_globals$state$variant_set_db_id, call_url)
+    
+    variantset <- brapi_get_call(call_url, caller_func = "get_variantset")
+    
+    i <- which(variantset$availableFormats$dataFormat == "Flapjack")
+    
+    if (length(i) > 0) {
+      req <- httr2::request(variantset$availableFormats$fileURL[i])
+      req <- httr2::req_headers(req, "Accept-Encoding" = "gzip, deflate")
+
+      if (!is.na(qbms_globals$state$token)) {
+        req <- httr2::req_headers(req, "Authorization" = paste0("Bearer ", qbms_globals$state$token))
+      }
+      
+      resp <- suppressWarnings(httr2::req_perform(req))
+      httr2::resp_check_status(resp)
+      
+      content <- gsub("#.+\\n+", "", httr2::resp_body_string(resp), perl = TRUE)
+      
+      # if (startsWith(content, qbms_globals$state$study_db_id)) {
+      if (qbms_globals$config$engine == "gigwa") {
+        gigwa_get_samples()
+        geno_map <- gigwa_get_markers()
+
+        variantset <- matrix(unlist(strsplit(content, "\t"))[-1], ncol = nrow(qbms_globals$state$samples), byrow = FALSE)
+
+        colnames(variantset) <- sub(".*\u00A7", "", qbms_globals$state$samples$germplasmDbId)
+        rownames(variantset) <- geno_map$`rs#`
+        
+        variantset <- as.data.frame(variantset)
+        
+      } else {
+        variantset <- t(utils::read.delim(text = content, row.names = 1, check.names = FALSE, stringsAsFactors = FALSE, colClasses = "character"))
+        variantset[variantset == ""] <- NA
+      }
+      
+    } else {
+      variantset <- NULL
+    }
+
+    qbms_globals$state$variantset <- variantset
+  }
+  
+  return(variantset)
+}
+
+#' Get marker position information
+#'
+#' @description
+#' Retrieves the genetic marker map associated with the currently active study.
+#' This includes the marker name, chromosome (or linkage group), and position.
+#'
+#' @return
+#' A data frame with three columns:
+#' \describe{
+#'   \item{rs#}{Marker name (variant name)}
+#'   \item{chrom}{Chromosome or linkage group name}
+#'   \item{pos}{Genetic or physical position of the marker}
+#' }
+#'  
+#' @author 
+#' Khaled Al-Shamaa (\email{k.el-shamaa@cgiar.org})
+#' 
+#' @seealso 
+#' \code{\link{set_qbms_config}}, \code{\link{set_study}}
+#' 
+#' @export
+get_marker_map <- function() {
+  if (is.null(qbms_globals$state$study_db_id)) {
+    stop("No study has been selected yet! You have to set your study first using the `set_study()` function")
+  }
+  
+  if (!is.null(qbms_globals$state$marker_map)) {
+    marker_map <- qbms_globals$state$marker_map
+  } else {
+    call_url <- get_brapi_url("get_map")
+    call_url <- sub("\\{studyDbId\\}", qbms_globals$state$study_db_id, call_url)
+    
+    map_db_id <- brapi_get_call(call_url, caller_func = "get_marker_map")$data$mapDbId
+    
+    call_url <- get_brapi_url("get_marker_map")
+    call_url <- sub("\\{mapDbId\\}", map_db_id, call_url)
+    
+    marker_map <- brapi_get_call(call_url, caller_func = "get_marker_map")$data
+    marker_map <- marker_map[, c("variantName", "linkageGroupName", "position")]
+    
+    colnames(marker_map) <- c("rs#", "chrom", "pos")
+    
+    qbms_globals$state$marker_map <- marker_map
+  }
+  
+  return(marker_map)
 }

@@ -1,8 +1,14 @@
+# QBMS 2.0.0 _2025-08-02_
+  * Add [Germinate](https://germinateplatform.github.io/get-germinate/) support using BrAPI v2 calls.
+  * Add new generic genotyping functions including `list_variantsets()`, `set_variantset()`, `get_variantset()`, `get_variants()`, and `get_marker_map()`.
+  * Add new `get_trial_pedigree()` function supports db compliance with BrAPI v2.
+  * Add new generic `login()` function wraps around all engine specific `login_*` functions.
+  * Fix a BreedBase login bug caused by incorrect `httr2` form encoding when sending credentials.
+  * Move special-case processing from `qbms.R` (before/after API calls) into the new internal `engine.R` module script.
+
 # QBMS 1.5.0 _2024-09-19_
   * Updated the core QBMS script to replace the non-CRAN [async](https://github.com/gaborcsardi/async) R package with the CRAN-standard [future](https://cran.r-project.org/package=future) and [future.apply](https://cran.r-project.org/package=future.apply) packages.
   * Updated the core QBMS script to substitute the deprecated [httr](https://httr.r-lib.org/) R package with the recommended [httr2](https://cran.r-project.org/package=httr2) package.
-
-# QBMS 1.2.0 _2024-09-17_
   * Add new `gigwa_get_allelematrix()` function that boosting the marker data retrieval speed by more than 10 times.
   * Add new `gigwa_get_markers()` function to retrieve the marker map that describe the physical positions of the markers on the chromosomes.
   * Add new `gigwa_get_sequences()` function to retrieve the list of sequences in the selected GIGWA project.
